@@ -1,25 +1,20 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('health')
 @Controller()
 export class AppController {
-  @ApiOperation({ summary: 'Health check endpoint' })
+  @ApiOperation({ summary: 'Lightweight health check endpoint' })
   @ApiResponse({ 
     status: 200, 
-    description: 'Application is healthy',
+    description: 'Service is healthy',
     schema: {
-      example: {
-        status: 'ok',
-        timestamp: '2024-02-20T12:00:00.000Z'
-      }
+      example: { status: 'ok' }
     }
   })
   @Get('health')
+  @HttpCode(HttpStatus.OK)
   healthCheck() {
-    return {
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-    };
+    return { status: 'ok' };
   }
 }

@@ -18,6 +18,10 @@ export class SystemConfigDTO {
   // Environment
   static NODE_ENV = 'NODE_ENV';
   static BASE_URL = 'BASE_URL';
+  
+  // Server Configuration
+  static RENDER_URL = 'RENDER_URL';
+  static IS_PRODUCTION = 'IS_PRODUCTION';
 }
 
 export interface EnvironmentConfig {
@@ -25,6 +29,7 @@ export interface EnvironmentConfig {
   jwtExpiresIn: string;
   isProduction: boolean;
   isDevelopment: boolean;
+  renderUrl?: string;
 }
 
 export default () => ({
@@ -32,4 +37,5 @@ export default () => ({
   jwtExpiresIn: '1d',
   isProduction: process.env.NODE_ENV === 'production',
   isDevelopment: process.env.NODE_ENV === 'development',
+  renderUrl: process.env.RENDER_URL,
 }); 

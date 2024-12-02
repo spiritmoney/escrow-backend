@@ -10,8 +10,10 @@ import { AuthService } from './auth/services/auth.service';
 import { UserRepository } from './auth/repositories/user.repository';
 import { WalletService } from './wallet/wallet.service';
 import { NodemailerService } from './services/nodemailer/NodemailerService';
+import { KeepaliveService } from './services/keepalive/KeepaliveService';
 import { JwtStrategy } from './auth/strategies/jwt.strategy';
 import { LocalStrategy } from './auth/strategies/local.strategy';
+import { AppController } from './app.controller';
 
 @Module({
   imports: [
@@ -32,13 +34,14 @@ import { LocalStrategy } from './auth/strategies/local.strategy';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, AppController],
   providers: [
     PrismaService,
     AuthService,
     UserRepository,
     WalletService,
     NodemailerService,
+    KeepaliveService,
     JwtStrategy,
     LocalStrategy,
   ],

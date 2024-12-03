@@ -131,5 +131,16 @@ export const systemResponses = {
     ESCROW_RELEASE_FAILED: 'Failed to release escrow',
     ESCROW_NOT_FOUND: 'Escrow contract not found',
     ESCROW_INVALID_STATE: 'Invalid escrow state for this operation',
+
+    // Payment Method Related
+    PAYMENT_METHOD_ADDED: 'Payment method added successfully',
+    PAYMENT_METHOD_DELETED: 'Payment method deleted successfully',
+    PAYMENT_METHOD_NOT_FOUND: 'Payment method not found',
+    PAYMENT_METHOD_UPDATE_FAILED: 'Failed to update payment method',
+    PAYMENT_METHOD_FETCH_ERROR: 'Error fetching payment methods',
+    PAYMENT_METHOD_EXISTS: 'Payment method already exists',
+    INVALID_BANK_SELECTED: 'Invalid bank selected. Please choose from the supported banks list',
+    DEFAULT_PAYMENT_METHOD_UPDATED: 'Default payment method updated successfully',
+    AUTO_PAYMENT_SETTINGS_UPDATED: 'Auto-payment settings updated successfully',
   },
 }; 

@@ -8,6 +8,7 @@ import { ConfigService } from '@nestjs/config';
 import { systemResponses } from '../../contracts/system.responses';
 import { PaymentLinkType } from '../dto/payment-link.dto';
 import { PaymentLinkTransactionService } from './payment-link-transaction.service';
+import { SubscriptionService } from '../../subscription/services/subscription.service';
 
 @Injectable()
 export class PaymentLinkService {
@@ -17,6 +18,7 @@ export class PaymentLinkService {
     private blockchainService: BlockchainService,
     private walletService: WalletService,
     private paymentLinkTransactionService: PaymentLinkTransactionService,
+    private subscriptionService: SubscriptionService,
   ) {}
 
   async getActiveLinks(userId: string) {
@@ -59,6 +61,12 @@ export class PaymentLinkService {
   }
 
   async createLink(userId: string, createLinkDto: CreatePaymentLinkDto) {
+    // Check payment link limits
+    const canCreateLink = await this.subscriptionService.incrementPaymentLinkCount(userId);
+    if (!canCreateLink) {
+      throw new BadRequestException('Payment link limit reached for your current plan. Please upgrade to create more payment links.');
+    }
+
     const baseUrl = this.configService.get<string>('RENDER_URL');
     const linkId = Math.random().toString(36).substring(7);
     const url = `${baseUrl}/pay/link-${linkId}`;

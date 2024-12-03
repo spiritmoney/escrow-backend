@@ -1,0 +1,160 @@
+{
+    "banks": [
+        {
+            "name": "Access Bank",
+            "code": "044"
+        },
+        {
+            "name": "First Bank of Nigeria",
+            "code": "011"
+        },
+        {
+            "name": "Guaranty Trust Bank",
+            "code": "058"
+        },
+        {
+            "name": "United Bank for Africa",
+            "code": "033"
+        },
+        {
+            "name": "Zenith Bank",
+            "code": "057"
+        },
+        {
+            "name": "Sterling Bank",
+            "code": "232"
+        },
+        {
+            "name": "Ecobank Nigeria",
+            "code": "050"
+        },
+        {
+            "name": "Fidelity Bank",
+            "code": "070"
+        },
+        {
+            "name": "Union Bank of Nigeria",
+            "code": "032"
+        },
+        {
+            "name": "Wema Bank",
+            "code": "035"
+        },
+        {
+            "name": "AB Microfinance Bank",
+            "code": "204"
+        },
+        {
+            "name": "Advans Nigeria Microfinance Bank",
+            "code": "234"
+        },
+        {
+            "name": "Fina Trust Microfinance Bank",
+            "code": "275"
+        },
+        {
+            "name": "Lapo Microfinance Bank",
+            "code": "205"
+        },
+        {
+            "name": "Parallex Bank",
+            "code": "104"
+        },
+        {
+            "name": "Paystack",
+            "code": "PS"
+        },
+        {
+            "name": "Flutterwave",
+            "code": "FW"
+        },
+        {
+            "name": "Paga",
+            "code": "PG"
+        },
+        {
+            "name": "Interswitch",
+            "code": "IS"
+        },
+        {
+            "name": "Cowrywise",
+            "code": "CW"
+        },
+        {
+            "name": "Kuda",
+            "code": "KD"
+        },
+        {
+            "name": "Opay",
+            "code": "C03"
+        },
+        {
+            "name": "Chipper Cash",
+            "code": "CC"
+        },
+        {
+            "name": "Quickteller",
+            "code": "QT"
+        },
+        {
+            "name": "First City Monument Bank",
+            "code": "214"
+        },
+        {
+            "name": "Jaiz Bank",
+            "code": "301"
+        },
+        {
+            "name": "Keystone Bank",
+            "code": "082"
+        },
+        {
+            "name": "Stanbic IBTC Bank",
+            "code": "039"
+        },
+        {
+            "name": "Unity Bank",
+            "code": "215"
+        },
+        {
+            "name": "Providus Bank",
+            "code": "101"
+        },
+        {
+            "name": "Lotus Bank",
+            "code": "303"
+        },
+        {
+            "name": "Premium Trust Bank",
+            "code": "105"
+        },
+        {
+            "name": "Signature Bank",
+            "code": "106"
+        },
+        {
+            "name": "Globus Bank",
+            "code": "103"
+        },
+        {
+            "name": "Titan Trust Bank",
+            "code": "102"
+        },
+        {
+            "name": "Polaris Bank",
+            "code": "067"
+        },
+        {
+            "name": "Optimus Bank",
+            "code": "107"
+        },
+        {
+            "name": "Standard Chartered Bank",
+            "code": "068"
+        },
+        {
+            "name": "Suntrust Bank",
+            "code": "100"
+        }
+    ]
+}

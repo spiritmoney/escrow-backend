@@ -28,6 +28,11 @@ import { PaymentLinkTransactionService } from './payment-link/services/payment-l
 import { TradeProtectionService } from './payment-link/services/trade-protection.service';
 import { EscrowMonitorService } from './payment-link/services/escrow-monitor.service';
 import { DisputeResolutionService } from './payment-link/services/dispute-resolution.service';
+import { SubscriptionController } from './subscription/controllers/subscription.controller';
+import { SubscriptionService } from './subscription/services/subscription.service';
+import { BillingController } from './subscription/controllers/billing.controller';
+import { PaymentMethodService } from './subscription/services/payment-method.service';
+import { BillingHistoryService } from './subscription/services/billing-history.service';
 
 @Module({
   imports: [
@@ -54,7 +59,9 @@ import { DisputeResolutionService } from './payment-link/services/dispute-resolu
     BalanceController, 
     PaymentController, 
     TransactionController, 
-    PaymentLinkController
+    PaymentLinkController,
+    SubscriptionController,
+    BillingController,
   ],
   providers: [
     // Core Services
@@ -82,6 +89,9 @@ import { DisputeResolutionService } from './payment-link/services/dispute-resolu
     TradeProtectionService,
     EscrowMonitorService,
     DisputeResolutionService,
+    SubscriptionService,
+    PaymentMethodService,
+    BillingHistoryService,
   ],
 })
 export class AppModule {}

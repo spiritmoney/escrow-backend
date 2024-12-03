@@ -31,6 +31,10 @@ model User {
   paymentLinkSettings  PaymentLinkSettings?
   initiatedDisputes Dispute[] @relation("DisputeInitiator")
   resolvedDisputes  Dispute[] @relation("DisputeResolver")
+  subscriptions      Subscription[]
+  paymentMethods     PaymentMethod[]
+  autoPaymentSettings AutoPaymentSettings?
+  billingHistory     BillingHistory[]
 
   @@map("users")
 }
@@ -158,4 +162,69 @@ model Dispute {
   updatedAt       DateTime     @updatedAt
 
   @@map("disputes")
+}
+
+model PaymentMethod {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   // 'CARD' or 'BANK_TRANSFER'
+  details   Json
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@map("payment_methods")
+}
+
+model AutoPaymentSettings {
+  id                      String   @id @default(cuid())
+  userId                  String   @unique
+  autoRenewSubscription   Boolean  @default(false)
+  sendPaymentNotifications Boolean @default(true)
+  updatedAt              DateTime @updatedAt
+  user                   User     @relation(fields: [userId], references: [id])
+
+  @@map("auto_payment_settings")
+}
+
+model BillingHistory {
+  id            String       @id @default(cuid())
+  userId        String
+  subscriptionId String
+  billingDate   DateTime
+  amount        Float
+  currency      String
+  status        String      // 'PAID', 'PENDING', 'FAILED'
+  paymentMethod Json?
+  user          User        @relation(fields: [userId], references: [id])
+  subscription  Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@map("billing_history")
+}
+
+model Subscription {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  planType  String   @default("STARTER")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+  usage     SubscriptionUsage?
+  billingHistory BillingHistory[]
+
+  @@map("subscriptions")
+}
+
+model SubscriptionUsage {
+  id                  String       @id @default(cuid())
+  subscriptionId      String       @unique
+  monthlyTransactions Int          @default(0)
+  apiCalls           Int          @default(0)
+  monthlyPaymentLinks Int          @default(0)
+  lastResetDate      DateTime     @default(now())
+  subscription       Subscription @relation(fields: [subscriptionId], references: [id])
+
+  @@map("subscription_usage")
 } 

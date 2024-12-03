@@ -14,6 +14,11 @@ import { KeepaliveService } from './services/keepalive/KeepaliveService';
 import { JwtStrategy } from './auth/strategies/jwt.strategy';
 import { LocalStrategy } from './auth/strategies/local.strategy';
 import { AppController } from './app.controller';
+import { BalanceController } from './balance/controllers/balance.controller';
+import { BalanceService } from './balance/services/balance.service';
+import { PaymentController } from './payment/controllers/payment.controller';
+import { PaymentRequestService } from './payment/services/payment-request.service';
+import { ConversionService } from './balance/services/conversion.service';
 
 @Module({
   imports: [
@@ -34,7 +39,7 @@ import { AppController } from './app.controller';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController, AppController],
+  controllers: [AuthController, AppController, BalanceController, PaymentController],
   providers: [
     PrismaService,
     AuthService,
@@ -44,6 +49,9 @@ import { AppController } from './app.controller';
     KeepaliveService,
     JwtStrategy,
     LocalStrategy,
+    BalanceService,
+    PaymentRequestService,
+    ConversionService,
   ],
 })
 export class AppModule {}

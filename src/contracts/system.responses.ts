@@ -59,5 +59,34 @@ export const systemResponses = {
     PROFILE_UPDATE_ERROR: 'Error updating profile',
     PROFILE_RETRIEVAL_ERROR: 'Error retrieving profile',
     PROFILE_NOT_FOUND: 'Profile not found',
+
+    // Balance Related
+    INSUFFICIENT_BALANCE: 'Insufficient balance for this transaction',
+    INVALID_CURRENCY: 'Invalid currency specified',
+    TRANSFER_SUCCESSFUL: 'Transfer completed successfully',
+    TRANSFER_FAILED: 'Transfer failed',
+    INVALID_AMOUNT: 'Invalid amount specified',
+    BALANCE_FETCH_ERROR: 'Error fetching balance',
+    
+    // Payment Related
+    PAYMENT_REQUEST_CREATED: 'Payment request created successfully',
+    PAYMENT_REQUEST_FAILED: 'Failed to create payment request',
+    PAYMENT_NOT_FOUND: 'Payment request not found',
+    PAYMENT_ALREADY_PROCESSED: 'Payment has already been processed',
+    PAYMENT_PROCESSED: 'Payment processed successfully',
+    
+    // Conversion Related
+    CONVERSION_FAILED: 'Currency conversion failed',
+    INVALID_CONVERSION_PAIR: 'Invalid currency conversion pair',
+    
+    // Recipient Related
+    RECIPIENT_NOT_FOUND: 'Recipient not found',
+    INVALID_RECIPIENT: 'Invalid recipient details',
+    SELF_TRANSFER_NOT_ALLOWED: 'Cannot transfer to self',
+    
+    // Crypto Related
+    INVALID_WALLET_CREDENTIALS: 'Invalid wallet credentials',
+    CRYPTO_TRANSFER_FAILED: 'Cryptocurrency transfer failed',
+    BLOCKCHAIN_ERROR: 'Blockchain transaction failed',
   },
 }; 

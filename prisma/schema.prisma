@@ -16,12 +16,17 @@ model User {
   country       String
   organisation  String
   walletAddress String?   @unique
-  role          UserRole  @default(HOBBYIST)
+  role          UserRole  @default(DEVELOPER)
   isVerified    Boolean   @default(false)
   otp           String?
   otpExpiry     DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  balance          Balance?
+  wallet           Wallet?
+  sentTransactions     Transaction[] @relation("SentTransactions")
+  receivedTransactions Transaction[] @relation("ReceivedTransactions")
+  paymentRequests      PaymentRequest[]
 
   @@map("users")
 }
@@ -29,4 +34,63 @@ model User {
 enum UserRole {
   BUSINESS
   DEVELOPER
+} 
+
+model Balance {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  ngn       Float    @default(0)
+  usd       Float    @default(0)
+  eur       Float    @default(0)
+  esp       Float    @default(0)
+  user      User     @relation(fields: [userId], references: [id])
+  updatedAt DateTime @updatedAt
+
+  @@map("balances")
+}
+
+model Transaction {
+  id              String    @id @default(cuid())
+  senderId        String
+  recipientId     String?
+  recipientWallet String?
+  amount          Float
+  currency        String
+  type            String    // 'FIAT' or 'CRYPTO'
+  status          String
+  note            String?
+  txHash          String?   // Blockchain transaction hash
+  createdAt       DateTime  @default(now())
+  sender          User      @relation("SentTransactions", fields: [senderId], references: [id])
+  recipient       User?     @relation("ReceivedTransactions", fields: [recipientId], references: [id])
+
+  @@map("transactions")
+}
+
+model PaymentRequest {
+  id          String   @id @default(cuid())
+  requesterId String
+  payerEmail  String
+  amount      Float
+  currency    String
+  description String
+  status      String   // 'PENDING', 'PAID', 'CANCELLED'
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  requester   User     @relation(fields: [requesterId], references: [id])
+
+  @@map("payment_requests")
+}
+
+model Wallet {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  address            String   @unique
+  encryptedPrivateKey String
+  iv                 String
+  user               User     @relation(fields: [userId], references: [id])
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  @@map("wallets")
 } 

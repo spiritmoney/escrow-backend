@@ -11,10 +11,23 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('port');
   
+  // CORS Configuration
+  app.enableCors({
+    origin: [
+      'http://localhost:3000',      // Local development
+      'http://localhost:5173',      // Vite default
+      'https://espeespay.vercel.app', // Production frontend
+      /\.vercel\.app$/,            // Any Vercel deployment
+    ],
+    methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  });
+  
   // Swagger Configuration
   const config = new DocumentBuilder()
-    .setTitle('EspeesPay API')
-    .setDescription('The EspeesPay API documentation')
+    .setTitle('EspeePay API')
+    .setDescription('The EspeePay API documentation')
     .setVersion('1.0')
     .addTag('auth', 'Authentication endpoints')
     .addBearerAuth()

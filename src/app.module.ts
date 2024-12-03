@@ -19,6 +19,15 @@ import { BalanceService } from './balance/services/balance.service';
 import { PaymentController } from './payment/controllers/payment.controller';
 import { PaymentRequestService } from './payment/services/payment-request.service';
 import { ConversionService } from './balance/services/conversion.service';
+import { TransactionController } from './transaction/controllers/transaction.controller';
+import { TransactionService } from './transaction/services/transaction.service';
+import { PaymentLinkController } from './payment-link/controllers/payment-link.controller';
+import { PaymentLinkService } from './payment-link/services/payment-link.service';
+import { BlockchainService } from './services/blockchain/blockchain.service';
+import { PaymentLinkTransactionService } from './payment-link/services/payment-link-transaction.service';
+import { TradeProtectionService } from './payment-link/services/trade-protection.service';
+import { EscrowMonitorService } from './payment-link/services/escrow-monitor.service';
+import { DisputeResolutionService } from './payment-link/services/dispute-resolution.service';
 
 @Module({
   imports: [
@@ -39,19 +48,40 @@ import { ConversionService } from './balance/services/conversion.service';
       inject: [ConfigService],
     }),
   ],
-  controllers: [AuthController, AppController, BalanceController, PaymentController],
+  controllers: [
+    AuthController, 
+    AppController, 
+    BalanceController, 
+    PaymentController, 
+    TransactionController, 
+    PaymentLinkController
+  ],
   providers: [
+    // Core Services
     PrismaService,
     AuthService,
     UserRepository,
     WalletService,
     NodemailerService,
     KeepaliveService,
+    
+    // Auth Strategies
     JwtStrategy,
     LocalStrategy,
+    
+    // Business Services
     BalanceService,
     PaymentRequestService,
     ConversionService,
+    TransactionService,
+    
+    // Payment Link Related Services
+    PaymentLinkService,
+    PaymentLinkTransactionService,
+    BlockchainService,
+    TradeProtectionService,
+    EscrowMonitorService,
+    DisputeResolutionService,
   ],
 })
 export class AppModule {}

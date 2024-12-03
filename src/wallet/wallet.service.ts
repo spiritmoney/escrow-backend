@@ -73,6 +73,12 @@ export class WalletService {
     return decrypted;
   }
 
+  decryptPrivateKey(encryptedKey: string, iv: string): string {
+    // Implement decryption logic here
+    // This should use the same encryption method used to encrypt the key
+    return "decrypted-key"; // Placeholder
+  }
+
   async transferESP(
     senderWalletAddress: string,
     recipientAddress: string,

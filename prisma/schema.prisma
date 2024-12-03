@@ -27,6 +27,10 @@ model User {
   sentTransactions     Transaction[] @relation("SentTransactions")
   receivedTransactions Transaction[] @relation("ReceivedTransactions")
   paymentRequests      PaymentRequest[]
+  paymentLinks         PaymentLink[]
+  paymentLinkSettings  PaymentLinkSettings?
+  initiatedDisputes Dispute[] @relation("DisputeInitiator")
+  resolvedDisputes  Dispute[] @relation("DisputeResolver")
 
   @@map("users")
 }
@@ -56,13 +60,23 @@ model Transaction {
   recipientWallet String?
   amount          Float
   currency        String
-  type            String    // 'FIAT' or 'CRYPTO'
+  type            String    // 'FIAT', 'CRYPTO', 'ESCROW', or 'GOODS'
   status          String
   note            String?
   txHash          String?   // Blockchain transaction hash
+  escrowAddress   String?   
+  originalAmount  Float?    
+  originalCurrency String?  
+  paymentMethod    String?    
+  paymentDetails   Json?      
+  paymentConfirmed Boolean    @default(false)
+  buyerConfirmed   Boolean    @default(false)
+  sellerConfirmed  Boolean    @default(false)
   createdAt       DateTime  @default(now())
+  expiresAt       DateTime?
   sender          User      @relation("SentTransactions", fields: [senderId], references: [id])
   recipient       User?     @relation("ReceivedTransactions", fields: [recipientId], references: [id])
+  disputes        Dispute[]
 
   @@map("transactions")
 }
@@ -93,4 +107,55 @@ model Wallet {
   updatedAt          DateTime @updatedAt
 
   @@map("wallets")
+}
+
+model PaymentLink {
+  id              String    @id @default(cuid())
+  name            String
+  url             String    @unique
+  status          String    @default("ACTIVE")
+  defaultAmount   Float?
+  defaultCurrency String?
+  escrowAddress   String?
+  sellerAddress   String?
+  buyerAddress    String?   
+  type            String    // 'BUYING' or 'SELLING'
+  transactionType String    // 'CRYPTOCURRENCY' or 'GOODS_SERVICES'
+  description     String?   // Description for goods/services
+  createdBy       User      @relation(fields: [userId], references: [id])
+  userId          String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@map("payment_links")
+}
+
+model PaymentLinkSettings {
+  id                    String    @id @default(cuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id])
+  defaultCurrency      String    @default("USD")
+  defaultExpirationTime Int      @default(24)
+  updatedAt            DateTime  @updatedAt
+
+  @@map("payment_link_settings")
+}
+
+model Dispute {
+  id              String        @id @default(cuid())
+  transactionId   String
+  transaction     Transaction   @relation(fields: [transactionId], references: [id])
+  initiatorId     String
+  initiator       User         @relation("DisputeInitiator", fields: [initiatorId], references: [id])
+  resolverId      String?
+  resolver        User?        @relation("DisputeResolver", fields: [resolverId], references: [id])
+  status          String
+  reason          String
+  evidence        String[]
+  resolutionNotes String?
+  createdAt       DateTime     @default(now())
+  resolvedAt      DateTime?
+  updatedAt       DateTime     @updatedAt
+
+  @@map("disputes")
 } 

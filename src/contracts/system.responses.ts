@@ -88,5 +88,48 @@ export const systemResponses = {
     INVALID_WALLET_CREDENTIALS: 'Invalid wallet credentials',
     CRYPTO_TRANSFER_FAILED: 'Cryptocurrency transfer failed',
     BLOCKCHAIN_ERROR: 'Blockchain transaction failed',
+
+    // Transaction Related
+    TRANSACTIONS_NOT_FOUND: 'No transactions found',
+    TRANSACTION_FETCH_ERROR: 'Error fetching transactions',
+    TRANSACTION_INITIATED: 'Transaction initiated successfully',
+    TRANSACTION_COMPLETED: 'Transaction completed successfully',
+    TRANSACTION_STATUS_UPDATED: 'Transaction status updated',
+    TRANSACTION_VALIDATION_FAILED: 'Transaction validation failed',
+    TRANSACTION_EXPIRED: 'Transaction has expired',
+    TRANSACTION_INVALID_STATUS: 'Invalid transaction status',
+    TRANSACTION_HISTORY_RETRIEVED: 'Transaction history retrieved successfully',
+    TRANSACTION_FAILED: 'Transaction failed',
+    INVALID_TRANSACTION_TYPE: 'Invalid transaction type',
+    INVALID_TRANSACTION_STATUS: 'Invalid transaction status',
+    
+    // Wallet Related
+    WALLET_NOT_FOUND: 'Wallet not found',
+    WALLET_UPDATE_ERROR: 'Error updating wallet',
+    WALLET_INITIALIZATION_ERROR: 'Error initializing wallet',
+    
+    // Settings Related
+    SETTINGS_UPDATE_FAILED: 'Failed to update settings',
+    SETTINGS_INVALID: 'Invalid settings provided',
+
+    // Payment Link Related
+    PAYMENT_LINK_CREATED: 'Payment link created successfully',
+    PAYMENT_LINK_NOT_FOUND: 'Payment link not found',
+    PAYMENT_LINK_EXPIRED: 'Payment link has expired',
+    PAYMENT_LINK_INACTIVE: 'Payment link is no longer active',
+    PAYMENT_LINK_UPDATE_FAILED: 'Failed to update payment link',
+    PAYMENT_LINK_SETTINGS_UPDATED: 'Payment link settings updated successfully',
+    PAYMENT_LINK_INVALID_TYPE: 'Invalid payment link type',
+    PAYMENT_LINK_UNAUTHORIZED: 'Unauthorized to access this payment link',
+
+    // Escrow Related
+    ESCROW_CREATED: 'Escrow contract created successfully',
+    ESCROW_FUNDED: 'Escrow funded successfully',
+    ESCROW_RELEASED: 'Escrow released successfully',
+    ESCROW_CREATION_FAILED: 'Failed to create escrow contract',
+    ESCROW_FUNDING_FAILED: 'Failed to fund escrow',
+    ESCROW_RELEASE_FAILED: 'Failed to release escrow',
+    ESCROW_NOT_FOUND: 'Escrow contract not found',
+    ESCROW_INVALID_STATE: 'Invalid escrow state for this operation',
   },
 }; 

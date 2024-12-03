@@ -1,6 +1,6 @@
 import { IsEmail, IsString, MinLength, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '../../contracts/roles.contract';
 
 export class LoginDto {
   @ApiProperty({
@@ -49,11 +49,11 @@ export class RegisterDto extends LoginDto {
   organisation: string;
 
   @ApiProperty({
-    enum: UserRole,
+    enum: ['BUSINESS', 'DEVELOPER'],
     example: 'DEVELOPER',
-    description: 'User role',
+    description: 'User role (BUSINESS or DEVELOPER)'
   })
-  @IsEnum(UserRole)
+  @IsEnum(['BUSINESS', 'DEVELOPER'] as const)
   role: UserRole;
 }
 

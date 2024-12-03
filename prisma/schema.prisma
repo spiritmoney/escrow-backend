@@ -27,9 +27,6 @@ model User {
 }
 
 enum UserRole {
-  MANAGER
+  BUSINESS
   DEVELOPER
-  PRODUCT_OWNER
-  SUPPORT_STAFF
-  HOBBYIST
 } 

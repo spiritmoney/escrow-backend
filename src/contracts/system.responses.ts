@@ -200,5 +200,10 @@ export const systemResponses = {
     CLOUDINARY_DELETE_ERROR: 'Error deleting from Cloudinary',
     CLOUDINARY_TRANSFORM_ERROR: 'Error transforming image',
     CLOUDINARY_CONNECTION_ERROR: 'Error connecting to Cloudinary',
+
+    // Support Ticket Related
+    INVALID_TICKET_DATA: 'Invalid ticket data provided',
+    TICKET_CREATION_FAILED: 'Failed to create support ticket',
+    TICKET_FETCH_FAILED: 'Failed to fetch support tickets',
   },
 }; 

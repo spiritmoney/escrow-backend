@@ -11,22 +11,17 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('port');
   
-  // Updated CORS Configuration
+  // CORS Configuration
   app.enableCors({
     origin: [
-      'http://localhost:3000',      
-      'http://localhost:5173',      
-      'https://espeespay.vercel.app',
-      /\.vercel\.app$/,            
+      'http://localhost:3000',      // Local development
+      'http://localhost:5173',      // Vite default
+      'https://espeespay.vercel.app', // Production frontend
+      /\.vercel\.app$/,            // Any Vercel deployment
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
-    allowedHeaders: [
-      'Content-Type', 
-      'Authorization', 
-      'X-Requested-With',
-      'X-API-Key'
-    ],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   });
   
   // Swagger Configuration
@@ -36,11 +31,56 @@ async function bootstrap() {
     .setVersion('1.0')
     .addTag('auth', 'Authentication endpoints')
     .addBearerAuth()
-    .addApiKey({ type: 'apiKey', in: 'header', name: 'x-api-key' }, 'x-api-key')
     .build();
     
   const document = SwaggerModule.createDocument(app, config);
+  
+  // Fix the invalid schema in the document
+  if (document.paths['/balance/convert']) {
+    const response200 = document.paths['/balance/convert'].post.responses['200'];
+    if ('schema' in response200) {
+      delete (response200 as any).schema;
+    }
+    
+    if (!('$ref' in response200)) {
+      response200.content = {
+        'application/json': {
+          schema: {
+            type: 'object',
+            properties: {
+              convertedAmount: {
+                type: 'number',
+                example: 1800
+              },
+              rate: {
+                type: 'number',
+                example: 1800
+              },
+              from: {
+                type: 'string',
+                example: 'ESP'
+              },
+              to: {
+                type: 'string',
+                example: 'NGN'
+              }
+            }
+          }
+        }
+      };
+    }
+  }
+  
   SwaggerModule.setup('api', app, document);
+  
+  // Save OpenAPI specification to file
+  const fs = require('fs');
+  const path = require('path');
+  fs.writeFileSync(
+    path.join(__dirname, '../openapi-spec.json'),
+    JSON.stringify(document, null, 2),
+    { encoding: 'utf8' }
+  );
   
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,

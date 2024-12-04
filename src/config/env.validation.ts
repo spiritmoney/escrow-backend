@@ -1,5 +1,5 @@
 import { plainToClass } from 'class-transformer';
-import { IsString, IsNumber, validateSync, IsEmail, IsNotEmpty } from 'class-validator';
+import { IsString, IsNumber, validateSync, IsEmail, IsNotEmpty, IsOptional } from 'class-validator';
 
 class EnvironmentVariables {
   @IsString()
@@ -35,6 +35,10 @@ class EnvironmentVariables {
   @IsString()
   @IsNotEmpty()
   SMTP_FROM: string;
+
+  @IsString()
+  @IsOptional()
+  SUPPORT_EMAIL: string;
 }
 
 export function validate(config: Record<string, unknown>) {

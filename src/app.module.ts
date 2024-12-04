@@ -17,6 +17,8 @@ import { PaymentLinkController } from './payment-link/controllers/payment-link.c
 import { SubscriptionController } from './subscription/controllers/subscription.controller';
 import { BillingController } from './subscription/controllers/billing.controller';
 import { ProfileController } from './profile/controllers/profile.controller';
+import { SupportController } from './support/controllers/support.controller';
+import { LiveChatController } from './support/controllers/live-chat.controller';
 
 // Services and Providers
 import { PrismaService } from './prisma/prisma.service';
@@ -45,6 +47,8 @@ import { CloudinaryService } from './services/cloudinary/cloudinary.service';
 import { HashingService } from './auth/services/hashing.service';
 import { ApiKeyAuthGuard } from './auth/guards/api-key-auth.guard';
 import { CombinedAuthGuard } from './auth/guards/combined-auth.guard';
+import { SupportService } from './support/services/support.service';
+import { LiveChatService } from './support/services/live-chat.service';
 
 // Cloudinary Provider
 const CloudinaryProvider = {
@@ -103,6 +107,8 @@ const CloudinaryProvider = {
     SubscriptionController,
     BillingController,
     ProfileController,
+    SupportController,
+    LiveChatController,
   ],
   providers: [
     // Core Services
@@ -143,6 +149,8 @@ const CloudinaryProvider = {
     // Guards
     ApiKeyAuthGuard,
     CombinedAuthGuard,
+    SupportService,
+    LiveChatService,
   ],
 })
 export class AppModule {}

@@ -1,72 +1,43 @@
-import { Injectable, OnModuleInit } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
-import { SystemConfigDTO } from '../../config/configuration';
 import { systemResponses } from '../../contracts/system.responses';
 
-interface EmailData {
+interface EmailOptions {
   to: string[];
   subject: string;
-  text?: string;
-  html?: string;
+  html: string;
 }
 
 @Injectable()
-export class NodemailerService implements OnModuleInit {
+export class NodemailerService {
   private transporter: nodemailer.Transporter;
+  public readonly supportEmail: string;
 
-  constructor(private configService: ConfigService) {}
-
-  async onModuleInit() {
-    const user = this.configService.get<string>(SystemConfigDTO.SMTP_USER);
-    const pass = this.configService.get<string>(SystemConfigDTO.SMTP_PASSWORD);
-
-    if (!user || !pass) {
-      throw new Error('Gmail credentials not provided');
-    }
-
+  constructor(private configService: ConfigService) {
+    this.supportEmail = this.configService.get<string>('SUPPORT_EMAIL') || 'support@espeepay.com';
+    
     this.transporter = nodemailer.createTransport({
-      service: 'gmail',
-      auth: { user, pass },
-      tls: {
-        rejectUnauthorized: false
-      }
+      host: this.configService.get('SMTP_HOST'),
+      port: this.configService.get('SMTP_PORT'),
+      secure: true,
+      auth: {
+        user: this.configService.get('SMTP_USER'),
+        pass: this.configService.get('SMTP_PASSWORD'),
+      },
     });
-
-    // Verify connection on startup
-    await this.verifyConnection();
   }
 
-  async sendEmail(data: EmailData) {
-    if (!this.transporter) {
-      throw new Error(systemResponses.EN.EMAIL_SEND_ERROR);
-    }
-
+  async sendEmail(options: EmailOptions): Promise<void> {
     try {
-      const mailOptions = {
-        from: this.configService.get(SystemConfigDTO.SMTP_FROM),
-        to: data.to.join(','),
-        subject: data.subject,
-        text: data.text,
-        html: data.html,
-      };
-
-      const resp = await this.transporter.sendMail(mailOptions);
-      console.log('Email sent successfully:', resp.messageId);
-      return resp;
-    } catch (err: any) {
-      console.error('Gmail sending error:', err);
-      throw new Error(systemResponses.EN.EMAIL_SEND_ERROR);
-    }
-  }
-
-  private async verifyConnection(): Promise<boolean> {
-    try {
-      await this.transporter.verify();
-      console.log('Gmail connection verified successfully');
-      return true;
+      await this.transporter.sendMail({
+        from: this.configService.get('SMTP_FROM_ADDRESS'),
+        to: options.to.join(', '),
+        subject: options.subject,
+        html: options.html,
+      });
     } catch (error) {
-      console.error('Failed to verify Gmail connection:', error);
+      console.error('Email send error:', error);
       throw new Error(systemResponses.EN.EMAIL_SEND_ERROR);
     }
   }

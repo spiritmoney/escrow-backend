@@ -1,0 +1,2490 @@
+{
+  "openapi": "3.0.0",
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "operationId": "AuthController_register",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "User successfully registered",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "user": {
+                      "id": "1234567890123456",
+                      "email": "user@example.com",
+                      "firstName": "John",
+                      "lastName": "Doe",
+                      "organisation": "Acme Corp",
+                      "role": "DEVELOPER",
+                      "walletAddress": "0x..."
+                    },
+                    "wallet": {
+                      "address": "0x...",
+                      "encryptedPrivateKey": "...",
+                      "iv": "..."
+                    },
+                    "message": "Please check your email for verification code"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "409": {
+            "description": "Email already exists"
+          }
+        },
+        "summary": "Register new user",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "operationId": "AuthController_login",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User successfully logged in",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "access_token": "eyJhbGciOiJIUzI1...",
+                    "user": {
+                      "id": "1234567890123456",
+                      "email": "user@example.com",
+                      "firstName": "John",
+                      "lastName": "Doe",
+                      "organisation": "Acme Corp",
+                      "role": "DEVELOPER",
+                      "walletAddress": "0x..."
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "summary": "Login user",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/verify-otp": {
+      "post": {
+        "operationId": "AuthController_verifyOTP",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyOtpDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Email verified successfully"
+          },
+          "400": {
+            "description": "Invalid OTP"
+          }
+        },
+        "summary": "Verify email with OTP",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/request-password-reset": {
+      "post": {
+        "operationId": "AuthController_requestPasswordReset",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPasswordResetDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset instructions sent"
+          }
+        },
+        "summary": "Request password reset",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/reset-password": {
+      "post": {
+        "operationId": "AuthController_resetPassword",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResetPasswordDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Password reset successful"
+          },
+          "400": {
+            "description": "Invalid OTP or password"
+          }
+        },
+        "summary": "Reset password with OTP",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/auth/profile": {
+      "get": {
+        "operationId": "AuthController_getProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "User profile retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "id": "1234567890123456",
+                    "email": "user@example.com",
+                    "firstName": "John",
+                    "lastName": "Doe",
+                    "organisation": "Acme Corp",
+                    "role": "DEVELOPER"
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user profile",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "AppController_healthCheck",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "status": "ok"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Lightweight health check endpoint",
+        "tags": [
+          "health"
+        ]
+      }
+    },
+    "/balance": {
+      "get": {
+        "operationId": "BalanceController_getBalances",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "User balances retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "fiat": {
+                      "NGN": 5678910,
+                      "USD": 12345.67,
+                      "EUR": 8234.5
+                    },
+                    "crypto": {
+                      "ESP": {
+                        "amount": 1000,
+                        "usdValue": 1234.56
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed"
+          },
+          "404": {
+            "description": "User not found"
+          },
+          "500": {
+            "description": "Error fetching balance"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user balances",
+        "tags": [
+          "balance"
+        ]
+      }
+    },
+    "/balance/send": {
+      "post": {
+        "operationId": "BalanceController_sendMoney",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMoneyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Transfer completed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Transfer completed successfully",
+                    "transactionHash": "0x123..."
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid recipient details"
+          },
+          "401": {
+            "description": "Authentication failed"
+          },
+          "404": {
+            "description": "Recipient not found"
+          },
+          "422": {
+            "description": "Insufficient balance for this transaction"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send money or crypto",
+        "tags": [
+          "balance"
+        ]
+      }
+    },
+    "/balance/request": {
+      "post": {
+        "operationId": "BalanceController_requestPayment",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RequestPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payment request created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Payment request created successfully",
+                    "requestId": "abc123",
+                    "paymentLink": "https://example.com/pay/abc123"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Failed to create payment request"
+          },
+          "401": {
+            "description": "Authentication failed"
+          },
+          "500": {
+            "description": "An internal server error occurred"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Request payment",
+        "tags": [
+          "balance"
+        ]
+      }
+    },
+    "/balance/convert": {
+      "post": {
+        "operationId": "BalanceController_convertCurrency",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ConvertCurrencyDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Currency converted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "convertedAmount": {
+                      "type": "number",
+                      "example": 1800
+                    },
+                    "rate": {
+                      "type": "number",
+                      "example": 1800
+                    },
+                    "from": {
+                      "type": "string",
+                      "example": "ESP"
+                    },
+                    "to": {
+                      "type": "string",
+                      "example": "NGN"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid currency conversion pair"
+          },
+          "401": {
+            "description": "Authentication failed"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Convert between currencies",
+        "tags": [
+          "balance"
+        ]
+      }
+    },
+    "/balance/rates": {
+      "get": {
+        "operationId": "BalanceController_getConversionRates",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Current conversion rates",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "ESP": {
+                      "NGN": 1800,
+                      "USD": 1,
+                      "EUR": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get current conversion rates",
+        "tags": [
+          "balance"
+        ]
+      }
+    },
+    "/payments/{requestId}": {
+      "get": {
+        "operationId": "PaymentController_getPaymentPage",
+        "parameters": [
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "description": "ID of the payment request",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment request details retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "paymentRequest": {
+                      "id": "abc123",
+                      "amount": 1000,
+                      "currency": "USD",
+                      "description": "Payment for services",
+                      "status": "PENDING",
+                      "requester": {
+                        "firstName": "John",
+                        "lastName": "Doe",
+                        "organisation": "Acme Corp"
+                      }
+                    },
+                    "pageData": {
+                      "title": "Payment to John Doe",
+                      "amount": 1000,
+                      "currency": "USD",
+                      "description": "Payment for services"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Payment has already been processed"
+          },
+          "404": {
+            "description": "Payment request not found"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get payment request details",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/payments/{requestId}/process": {
+      "post": {
+        "operationId": "PaymentController_processPayment",
+        "parameters": [
+          {
+            "name": "requestId",
+            "required": true,
+            "in": "path",
+            "description": "ID of the payment request to process",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "example": {
+                  "userId": "user123"
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment processed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Payment processed successfully"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Payment has already been processed"
+          },
+          "401": {
+            "description": "Authentication failed"
+          },
+          "404": {
+            "description": "Payment request not found"
+          },
+          "422": {
+            "description": "Insufficient balance for this transaction"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Process payment for a payment request",
+        "tags": [
+          "payments"
+        ]
+      }
+    },
+    "/transactions": {
+      "get": {
+        "operationId": "TransactionController_getTransactions",
+        "parameters": [
+          {
+            "name": "type",
+            "required": false,
+            "in": "query",
+            "description": "Filter by transaction type",
+            "schema": {
+              "enum": [
+                "PAYMENT",
+                "TRANSFER",
+                "DEPOSIT",
+                "WITHDRAWAL"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by transaction status",
+            "schema": {
+              "enum": [
+                "PENDING",
+                "COMPLETED",
+                "FAILED",
+                "CANCELLED"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Search by transaction ID or recipient name",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Transaction history retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "message": {
+                      "type": "string",
+                      "example": "Transaction history retrieved successfully"
+                    },
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "example": "TX123"
+                          },
+                          "date": {
+                            "type": "string",
+                            "example": "2024-02-20T12:00:00Z"
+                          },
+                          "type": {
+                            "type": "string",
+                            "enum": [
+                              "PAYMENT",
+                              "TRANSFER",
+                              "DEPOSIT",
+                              "WITHDRAWAL"
+                            ]
+                          },
+                          "amount": {
+                            "type": "number",
+                            "example": 500
+                          },
+                          "currency": {
+                            "type": "string",
+                            "example": "USD"
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "PENDING",
+                              "COMPLETED",
+                              "FAILED",
+                              "CANCELLED"
+                            ]
+                          },
+                          "note": {
+                            "type": "string",
+                            "example": "Payment for services"
+                          },
+                          "recipient": {
+                            "type": "string",
+                            "example": "John Doe"
+                          },
+                          "sender": {
+                            "type": "string",
+                            "example": "Jane Smith"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Error fetching transactions"
+          },
+          "401": {
+            "description": "Authentication failed"
+          },
+          "404": {
+            "description": "No transactions found"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user transaction history",
+        "tags": [
+          "transactions"
+        ]
+      }
+    },
+    "/payment-links": {
+      "get": {
+        "operationId": "PaymentLinkController_getActiveLinks",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List of active payment links retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "links": [
+                      {
+                        "id": "1",
+                        "name": "Payment Link #1",
+                        "url": "https://escrow-pay.vercel.app/pay/link-1",
+                        "status": "ACTIVE",
+                        "type": "SELLING",
+                        "transactionType": "CRYPTOCURRENCY",
+                        "defaultAmount": 1000,
+                        "defaultCurrency": "USD",
+                        "blockchainStatus": "AWAITING_PAYMENT"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get active payment links",
+        "tags": [
+          "payment-links"
+        ]
+      },
+      "post": {
+        "operationId": "PaymentLinkController_createLink",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePaymentLinkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Payment link created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "id": "1",
+                    "name": "Payment Link #1",
+                    "url": "https://escrow-pay.vercel.app/pay/link-1",
+                    "type": "SELLING",
+                    "transactionType": "CRYPTOCURRENCY",
+                    "defaultAmount": 1000,
+                    "defaultCurrency": "USD"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create new payment link",
+        "tags": [
+          "payment-links"
+        ]
+      }
+    },
+    "/payment-links/settings": {
+      "patch": {
+        "operationId": "PaymentLinkController_updateSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePaymentLinkSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Settings updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Settings updated successfully",
+                    "settings": {
+                      "defaultCurrency": "USD",
+                      "defaultExpirationTime": 24
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update payment link settings",
+        "tags": [
+          "payment-links"
+        ]
+      }
+    },
+    "/payment-links/{id}/transactions": {
+      "post": {
+        "operationId": "PaymentLinkController_initiateTransaction",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InitiateTransactionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Transaction initiated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "transactionId": "1",
+                    "escrowAddress": "0x...",
+                    "amount": 1000,
+                    "status": "PENDING",
+                    "expiresAt": "2024-03-10T15:00:00Z"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request"
+          },
+          "401": {
+            "description": "Unauthorized"
+          },
+          "404": {
+            "description": "Payment Link Not Found"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Initiate transaction for payment link",
+        "tags": [
+          "payment-links"
+        ]
+      }
+    },
+    "/subscription/plan": {
+      "get": {
+        "operationId": "SubscriptionController_getCurrentPlan",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Current subscription plan details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionPlan"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get current subscription plan",
+        "tags": [
+          "subscription"
+        ]
+      }
+    },
+    "/subscription/upgrade": {
+      "post": {
+        "operationId": "SubscriptionController_upgradePlan",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSubscriptionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Subscription plan upgraded successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SubscriptionPlan"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Upgrade subscription plan",
+        "tags": [
+          "subscription"
+        ]
+      }
+    },
+    "/billing/payment-methods": {
+      "get": {
+        "operationId": "BillingController_getPaymentMethods",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get all payment methods",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/billing/payment-methods/card": {
+      "post": {
+        "operationId": "BillingController_addCardPaymentMethod",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CardPaymentMethodDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add card payment method",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/billing/payment-methods/bank": {
+      "post": {
+        "operationId": "BillingController_addBankTransferMethod",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BankTransferMethodDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Add bank transfer payment method",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/billing/payment-methods/{id}/default": {
+      "put": {
+        "operationId": "BillingController_setDefaultPaymentMethod",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Set payment method as default",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/billing/payment-methods/{id}": {
+      "delete": {
+        "operationId": "BillingController_deletePaymentMethod",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete payment method",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/billing/auto-payment-settings": {
+      "put": {
+        "operationId": "BillingController_updateAutoPaymentSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AutoPaymentSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update auto-payment settings",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/billing/history": {
+      "get": {
+        "operationId": "BillingController_getBillingHistory",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get billing history",
+        "tags": [
+          "billing"
+        ]
+      }
+    },
+    "/profile": {
+      "get": {
+        "operationId": "ProfileController_getProfile",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Profile details retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "fullName": "John Doe",
+                    "email": "john@example.com",
+                    "phone": "+1 234 567 8900",
+                    "kycLevel": "Level 1",
+                    "transactionLimit": "$1,000/day",
+                    "apiKey": "********",
+                    "twoFactorEnabled": false,
+                    "apiAccess": true,
+                    "webhookNotifications": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user profile details",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/profile/personal-info": {
+      "put": {
+        "operationId": "ProfileController_updatePersonalInfo",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateProfileDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Profile updated successfully"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update personal information",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/profile/photo": {
+      "post": {
+        "operationId": "ProfileController_updateProfilePhoto",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Profile photo updated successfully"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update profile photo",
+        "tags": [
+          "profile"
+        ]
+      },
+      "delete": {
+        "operationId": "ProfileController_deleteProfilePhoto",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Profile photo deleted successfully"
+          },
+          "404": {
+            "description": "Profile photo not found"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete profile photo",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/profile/security": {
+      "put": {
+        "operationId": "ProfileController_updateSecuritySettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSecuritySettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Security settings updated successfully"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update security settings",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/profile/api-settings": {
+      "put": {
+        "operationId": "ProfileController_updateApiSettings",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ApiSettingsDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "API settings updated successfully"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update API settings",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/profile/regenerate-api-key": {
+      "post": {
+        "operationId": "ProfileController_regenerateApiKey",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "API key regenerated successfully"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Regenerate API key",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/profile/kyc-status": {
+      "get": {
+        "operationId": "ProfileController_getKycStatus",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "KYC status retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "currentLevel": "Level 1",
+                    "transactionLimit": "$1,000/day",
+                    "verificationRequired": true
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get KYC verification status",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/support/tickets": {
+      "post": {
+        "operationId": "SupportController_createTicket",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupportTicketDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Support ticket created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "id": "ticket_123",
+                    "subject": "Payment Issue",
+                    "status": "OPEN",
+                    "createdAt": "2024-03-10T12:00:00Z",
+                    "ticketNumber": "TKT-2024-001"
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid ticket data provided"
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Create a new support ticket",
+        "tags": [
+          "support"
+        ]
+      },
+      "get": {
+        "operationId": "SupportController_getTickets",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Support tickets retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "tickets": [
+                      {
+                        "id": "ticket_123",
+                        "subject": "Payment Issue",
+                        "status": "OPEN",
+                        "createdAt": "2024-03-10T12:00:00Z",
+                        "ticketNumber": "TKT-2024-001",
+                        "lastUpdated": "2024-03-10T12:00:00Z"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user support tickets",
+        "tags": [
+          "support"
+        ]
+      }
+    },
+    "/support/live-chat/initiate": {
+      "post": {
+        "operationId": "LiveChatController_initiateChat",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/InitiateChatDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Chat session initiated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "sessionId": "chat_123",
+                    "status": "ACTIVE",
+                    "createdAt": "2024-03-10T12:00:00Z",
+                    "estimatedWaitTime": "2 minutes"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Initiate a live chat session",
+        "tags": [
+          "support"
+        ]
+      }
+    },
+    "/support/live-chat/session/{sessionId}": {
+      "get": {
+        "operationId": "LiveChatController_getChatSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chat session details retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "sessionId": "chat_123",
+                    "status": "ACTIVE",
+                    "messages": [
+                      {
+                        "id": "msg_1",
+                        "content": "Hello, how can I help you today?",
+                        "sender": "AGENT",
+                        "timestamp": "2024-03-10T12:00:00Z"
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get chat session details",
+        "tags": [
+          "support"
+        ]
+      }
+    },
+    "/support/live-chat/session/{sessionId}/message": {
+      "post": {
+        "operationId": "LiveChatController_sendMessage",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChatMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Message sent successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "messageId": "msg_1",
+                    "content": "Hello, I need help with...",
+                    "timestamp": "2024-03-10T12:00:00Z",
+                    "status": "SENT"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Send a message in chat session",
+        "tags": [
+          "support"
+        ]
+      }
+    },
+    "/support/live-chat/session/{sessionId}/end": {
+      "post": {
+        "operationId": "LiveChatController_endChatSession",
+        "parameters": [
+          {
+            "name": "sessionId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chat session ended successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "sessionId": "chat_123",
+                    "status": "CLOSED",
+                    "endedAt": "2024-03-10T12:30:00Z"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "x-api-key": []
+          },
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "End chat session",
+        "tags": [
+          "support"
+        ]
+      }
+    }
+  },
+  "info": {
+    "title": "EspeePay API",
+    "description": "The EspeePay API documentation",
+    "version": "1.0",
+    "contact": {}
+  },
+  "tags": [
+    {
+      "name": "auth",
+      "description": "Authentication endpoints"
+    }
+  ],
+  "servers": [],
+  "components": {
+    "securitySchemes": {
+      "bearer": {
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "type": "http"
+      }
+    },
+    "schemas": {
+      "RegisterDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "user@example.com",
+            "description": "User email address"
+          },
+          "password": {
+            "type": "string",
+            "example": "Test123!@#",
+            "description": "User password (min 8 characters)"
+          },
+          "firstName": {
+            "type": "string",
+            "example": "John",
+            "description": "User first name"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Doe",
+            "description": "User last name"
+          },
+          "country": {
+            "type": "string",
+            "example": "US",
+            "description": "User country"
+          },
+          "organisation": {
+            "type": "string",
+            "example": "Acme Corp",
+            "description": "User organization"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "BUSINESS",
+              "DEVELOPER"
+            ],
+            "example": "DEVELOPER",
+            "description": "User role (BUSINESS or DEVELOPER)"
+          }
+        },
+        "required": [
+          "email",
+          "password",
+          "firstName",
+          "lastName",
+          "country",
+          "organisation",
+          "role"
+        ]
+      },
+      "LoginDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "user@example.com",
+            "description": "User email address"
+          },
+          "password": {
+            "type": "string",
+            "example": "Test123!@#",
+            "description": "User password (min 8 characters)"
+          }
+        },
+        "required": [
+          "email",
+          "password"
+        ]
+      },
+      "VerifyOtpDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "user@example.com",
+            "description": "User email address"
+          },
+          "otp": {
+            "type": "string",
+            "example": "123456",
+            "description": "6-digit OTP code"
+          }
+        },
+        "required": [
+          "email",
+          "otp"
+        ]
+      },
+      "RequestPasswordResetDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "user@example.com",
+            "description": "User email address"
+          }
+        },
+        "required": [
+          "email"
+        ]
+      },
+      "ResetPasswordDto": {
+        "type": "object",
+        "properties": {
+          "email": {
+            "type": "string",
+            "example": "user@example.com",
+            "description": "User email address"
+          },
+          "otp": {
+            "type": "string",
+            "example": "123456",
+            "description": "6-digit OTP code"
+          },
+          "newPassword": {
+            "type": "string",
+            "example": "NewTest123!@#",
+            "description": "New password (min 8 characters)"
+          }
+        },
+        "required": [
+          "email",
+          "otp",
+          "newPassword"
+        ]
+      },
+      "SendMoneyDto": {
+        "type": "object",
+        "properties": {
+          "assetType": {
+            "type": "string",
+            "enum": [
+              "FIAT",
+              "CRYPTO"
+            ],
+            "example": "FIAT",
+            "description": "Type of asset to send"
+          },
+          "recipientAddress": {
+            "type": "string",
+            "example": "user@example.com",
+            "description": "Recipient email (for FIAT) or wallet address (for CRYPTO)"
+          },
+          "amount": {
+            "type": "number",
+            "example": 1000,
+            "description": "Amount to send"
+          },
+          "currency": {
+            "type": "string",
+            "enum": [
+              "NGN",
+              "USD",
+              "EUR"
+            ],
+            "example": "USD",
+            "description": "Currency for FIAT transfers"
+          },
+          "note": {
+            "type": "string",
+            "example": "Payment for services",
+            "description": "Optional note for the transaction"
+          }
+        },
+        "required": [
+          "assetType",
+          "recipientAddress",
+          "amount"
+        ]
+      },
+      "RequestPaymentDto": {
+        "type": "object",
+        "properties": {
+          "currency": {
+            "type": "string",
+            "enum": [
+              "NGN",
+              "USD",
+              "EUR"
+            ],
+            "example": "USD",
+            "description": "Currency for payment request"
+          },
+          "amount": {
+            "type": "number",
+            "example": 1000,
+            "description": "Amount to request"
+          },
+          "payerEmail": {
+            "type": "string",
+            "example": "payer@example.com",
+            "description": "Email of the person who should pay"
+          },
+          "description": {
+            "type": "string",
+            "example": "Invoice for February services",
+            "description": "Description of the payment request"
+          }
+        },
+        "required": [
+          "currency",
+          "amount",
+          "payerEmail",
+          "description"
+        ]
+      },
+      "ConvertCurrencyDto": {
+        "type": "object",
+        "properties": {
+          "from": {
+            "type": "string",
+            "example": "ESP",
+            "description": "Currency to convert from"
+          },
+          "to": {
+            "type": "string",
+            "example": "USD",
+            "description": "Currency to convert to"
+          },
+          "amount": {
+            "type": "number",
+            "example": 1000,
+            "description": "Amount to convert"
+          }
+        },
+        "required": [
+          "from",
+          "to",
+          "amount"
+        ]
+      },
+      "ConversionResponse": {
+        "type": "object",
+        "properties": {
+          "convertedAmount": {
+            "type": "number",
+            "example": 1800,
+            "description": "Converted amount"
+          },
+          "rate": {
+            "type": "number",
+            "example": 1800,
+            "description": "Conversion rate"
+          },
+          "from": {
+            "type": "string",
+            "example": "ESP",
+            "description": "Source currency"
+          },
+          "to": {
+            "type": "string",
+            "example": "NGN",
+            "description": "Target currency"
+          }
+        },
+        "required": [
+          "convertedAmount",
+          "rate",
+          "from",
+          "to"
+        ]
+      },
+      "CreatePaymentLinkDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "example": "Payment Link #1",
+            "description": "Name of the payment link"
+          },
+          "defaultAmount": {
+            "type": "number",
+            "example": 1000,
+            "description": "Default amount for the payment link"
+          },
+          "defaultCurrency": {
+            "type": "string",
+            "enum": [
+              "NGN",
+              "USD",
+              "EUR"
+            ],
+            "example": "USD",
+            "description": "Default currency for the payment link"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "BUYING",
+              "SELLING"
+            ],
+            "example": "SELLING",
+            "description": "Type of payment link (buying or selling)"
+          },
+          "transactionType": {
+            "type": "string",
+            "enum": [
+              "CRYPTOCURRENCY",
+              "GOODS_SERVICES"
+            ],
+            "example": "CRYPTOCURRENCY",
+            "description": "Type of transaction (cryptocurrency or goods/services)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Description of goods/services (required for GOODS_SERVICES)"
+          }
+        },
+        "required": [
+          "name",
+          "type",
+          "transactionType"
+        ]
+      },
+      "UpdatePaymentLinkSettingsDto": {
+        "type": "object",
+        "properties": {
+          "defaultCurrency": {
+            "type": "string",
+            "enum": [
+              "NGN",
+              "USD",
+              "EUR"
+            ],
+            "example": "USD",
+            "description": "Default currency for payment links"
+          },
+          "defaultExpirationTime": {
+            "type": "number",
+            "example": 24,
+            "description": "Default expiration time in hours"
+          }
+        },
+        "required": [
+          "defaultCurrency",
+          "defaultExpirationTime"
+        ]
+      },
+      "InitiateTransactionDto": {
+        "type": "object",
+        "properties": {
+          "amount": {
+            "type": "number"
+          },
+          "currency": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount",
+          "currency"
+        ]
+      },
+      "SubscriptionUsage": {
+        "type": "object",
+        "properties": {
+          "monthlyTransactions": {
+            "type": "number",
+            "example": 85,
+            "description": "Current monthly transactions"
+          },
+          "monthlyTransactionLimit": {
+            "type": "number",
+            "example": 100,
+            "description": "Monthly transaction limit"
+          },
+          "apiCalls": {
+            "type": "number",
+            "example": 450,
+            "description": "Current API calls"
+          },
+          "apiCallLimit": {
+            "type": "number",
+            "example": 500,
+            "description": "API call limit"
+          },
+          "monthlyPaymentLinks": {
+            "type": "number",
+            "example": 5,
+            "description": "Current payment links created this month"
+          },
+          "paymentLinkLimit": {
+            "type": "number",
+            "example": 10,
+            "description": "Payment link creation limit"
+          }
+        },
+        "required": [
+          "monthlyTransactions",
+          "monthlyTransactionLimit",
+          "apiCalls",
+          "apiCallLimit",
+          "monthlyPaymentLinks",
+          "paymentLinkLimit"
+        ]
+      },
+      "SubscriptionPlan": {
+        "type": "object",
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "STARTER",
+              "PRO",
+              "ENTERPRISE"
+            ]
+          },
+          "price": {
+            "type": "number",
+            "example": 0,
+            "description": "Monthly cost in USD"
+          },
+          "isActive": {
+            "type": "boolean",
+            "example": true,
+            "description": "Whether plan is currently active"
+          },
+          "usage": {
+            "$ref": "#/components/schemas/SubscriptionUsage"
+          }
+        },
+        "required": [
+          "type",
+          "price",
+          "isActive",
+          "usage"
+        ]
+      },
+      "UpdateSubscriptionDto": {
+        "type": "object",
+        "properties": {
+          "planType": {
+            "type": "string",
+            "enum": [
+              "STARTER",
+              "PRO",
+              "ENTERPRISE"
+            ]
+          }
+        },
+        "required": [
+          "planType"
+        ]
+      },
+      "CardPaymentMethodDto": {
+        "type": "object",
+        "properties": {
+          "cardNumber": {
+            "type": "string",
+            "example": "4242424242424242"
+          },
+          "expiryDate": {
+            "type": "string",
+            "example": "12/24"
+          },
+          "cvc": {
+            "type": "string",
+            "example": "123"
+          },
+          "cardholderName": {
+            "type": "string",
+            "example": "John Doe"
+          },
+          "setAsDefault": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "cardNumber",
+          "expiryDate",
+          "cvc",
+          "cardholderName"
+        ]
+      },
+      "BankTransferMethodDto": {
+        "type": "object",
+        "properties": {
+          "bankName": {
+            "type": "string",
+            "example": "Guaranty Trust Bank",
+            "description": "Name of the bank",
+            "enum": [
+              "Access Bank",
+              "First Bank of Nigeria",
+              "Guaranty Trust Bank",
+              "United Bank for Africa",
+              "Zenith Bank",
+              "Sterling Bank",
+              "Ecobank Nigeria",
+              "Fidelity Bank",
+              "Union Bank of Nigeria",
+              "Wema Bank",
+              "Kuda",
+              "Opay"
+            ]
+          },
+          "accountHolderName": {
+            "type": "string",
+            "example": "John Doe"
+          },
+          "accountNumber": {
+            "type": "string",
+            "example": "000123456789"
+          },
+          "accountType": {
+            "type": "string",
+            "enum": [
+              "CURRENT",
+              "SAVINGS"
+            ],
+            "example": "CURRENT",
+            "description": "Type of bank account (CURRENT or SAVINGS)"
+          },
+          "setAsDefault": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "bankName",
+          "accountHolderName",
+          "accountNumber",
+          "accountType"
+        ]
+      },
+      "AutoPaymentSettingsDto": {
+        "type": "object",
+        "properties": {
+          "autoRenewSubscription": {
+            "type": "boolean",
+            "example": true
+          },
+          "sendPaymentNotifications": {
+            "type": "boolean",
+            "example": true
+          }
+        },
+        "required": [
+          "autoRenewSubscription",
+          "sendPaymentNotifications"
+        ]
+      },
+      "UpdateProfileDto": {
+        "type": "object",
+        "properties": {
+          "firstName": {
+            "type": "string",
+            "example": "John",
+            "description": "User first name"
+          },
+          "lastName": {
+            "type": "string",
+            "example": "Doe",
+            "description": "User last name"
+          },
+          "email": {
+            "type": "string",
+            "example": "john@example.com",
+            "description": "User email address"
+          },
+          "phone": {
+            "type": "string",
+            "example": "+1 234 567 8900",
+            "description": "User phone number"
+          },
+          "photoUrl": {
+            "type": "string",
+            "example": "https://storage.cloud.com/profile-images/user123.jpg",
+            "description": "Profile image URL"
+          }
+        },
+        "required": [
+          "firstName",
+          "lastName",
+          "email",
+          "phone"
+        ]
+      },
+      "UpdateSecuritySettingsDto": {
+        "type": "object",
+        "properties": {
+          "currentPassword": {
+            "type": "string",
+            "description": "Current password"
+          },
+          "newPassword": {
+            "type": "string",
+            "description": "New password"
+          },
+          "confirmNewPassword": {
+            "type": "string",
+            "description": "Confirm new password"
+          },
+          "twoFactorEnabled": {
+            "type": "boolean",
+            "description": "Enable/disable two-factor authentication"
+          }
+        },
+        "required": [
+          "currentPassword",
+          "newPassword",
+          "confirmNewPassword"
+        ]
+      },
+      "ApiSettingsDto": {
+        "type": "object",
+        "properties": {
+          "apiAccess": {
+            "type": "boolean",
+            "description": "Enable/disable API access"
+          },
+          "webhookNotifications": {
+            "type": "boolean",
+            "description": "Enable/disable webhook notifications"
+          }
+        }
+      },
+      "CreateSupportTicketDto": {
+        "type": "object",
+        "properties": {
+          "subject": {
+            "type": "string",
+            "example": "Payment Issue",
+            "description": "Subject of the support ticket"
+          },
+          "message": {
+            "type": "string",
+            "example": "I am having trouble processing a payment...",
+            "description": "Detailed description of the issue"
+          }
+        },
+        "required": [
+          "subject",
+          "message"
+        ]
+      },
+      "InitiateChatDto": {
+        "type": "object",
+        "properties": {
+          "topic": {
+            "type": "string",
+            "example": "Payment Processing Issue",
+            "description": "Initial topic or subject for the chat"
+          },
+          "initialMessage": {
+            "type": "string",
+            "example": "I need help with processing a payment",
+            "description": "Initial message to start the chat"
+          }
+        },
+        "required": [
+          "topic"
+        ]
+      },
+      "ChatMessageDto": {
+        "type": "object",
+        "properties": {
+          "content": {
+            "type": "string",
+            "example": "Hello, I need assistance with...",
+            "description": "Chat message content"
+          }
+        },
+        "required": [
+          "content"
+        ]
+      }
+    }
+  }
+}

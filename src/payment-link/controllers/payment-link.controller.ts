@@ -1,11 +1,12 @@
 import { Controller, Get, Post, Body, UseGuards, Patch, Param, HttpException, HttpStatus } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiProperty } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody, ApiProperty, ApiSecurity } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { PaymentLinkService } from '../services/payment-link.service';
 import { CreatePaymentLinkDto, UpdatePaymentLinkSettingsDto } from '../dto/payment-link.dto';
 import { systemResponses } from '../../contracts/system.responses';
 import { IsNumber, IsString } from 'class-validator';
+import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
 
 export class InitiateTransactionDto {
   @ApiProperty()
@@ -19,7 +20,8 @@ export class InitiateTransactionDto {
 
 @ApiTags('payment-links')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@ApiSecurity('x-api-key')
+@UseGuards(CombinedAuthGuard)
 @Controller('payment-links')
 export class PaymentLinkController {
   constructor(private paymentLinkService: PaymentLinkService) {}

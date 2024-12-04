@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Param, Body, UseGuards, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth, ApiSecurity } from '@nestjs/swagger';
 import { PaymentRequestService } from '../services/payment-request.service';
 import { BalanceService } from '../../balance/services/balance.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
@@ -7,9 +7,13 @@ import { systemResponses } from '../../contracts/system.responses';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NodemailerService } from '../../services/nodemailer/NodemailerService';
 import { AssetType, FiatCurrency } from '../../balance/dto/balance.dto';
+import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
 
-@ApiTags('payment')
-@Controller('pay')
+@ApiTags('payments')
+@ApiBearerAuth()
+@ApiSecurity('x-api-key')
+@UseGuards(CombinedAuthGuard)
+@Controller('payments')
 export class PaymentController {
   constructor(
     private paymentRequestService: PaymentRequestService,

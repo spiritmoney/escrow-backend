@@ -1,12 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { IAuthService } from '../interfaces/auth.interface';
+import { IAuthService, RegisterResponse } from '../interfaces/auth.interface';
 import { UserRepository } from '../repositories/user.repository';
 import { LoginDto, RegisterDto, VerifyOtpDto, RequestPasswordResetDto, ResetPasswordDto } from '../dto/auth.dto';
 import { WalletService } from '../../wallet/wallet.service';
 import { NodemailerService } from '../../services/nodemailer/NodemailerService';
 import { systemResponses } from '../../contracts/system.responses';
 import * as bcrypt from 'bcrypt';
+import { generateApiKey } from '../../utils/api-key.util';
+import { PrismaService } from '../../prisma/prisma.service';
 
 @Injectable()
 export class AuthService implements IAuthService {
@@ -15,6 +17,7 @@ export class AuthService implements IAuthService {
     private jwtService: JwtService,
     private walletService: WalletService,
     private emailService: NodemailerService,
+    private prisma: PrismaService,
   ) {}
 
   private generateOTP(): string {
@@ -67,65 +70,107 @@ export class AuthService implements IAuthService {
   }
 
   async login(user: any) {
-    const payload = { 
-      email: user.email, 
-      sub: user.id, 
-      role: user.role,
-      organisation: user.organisation 
-    };
-    
-    return {
-      access_token: this.jwtService.sign(payload),
-      user: {
-        id: user.id,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        organisation: user.organisation,
+    try {
+      const payload = { 
+        email: user.email, 
+        sub: user.id, 
         role: user.role,
-        walletAddress: user.walletAddress
-      },
-      message: systemResponses.EN.LOGIN_SUCCESS
-    };
+        organisation: user.organisation 
+      };
+      
+      const apiSettings = await this.prisma.apiSettings.findUnique({
+        where: { userId: user.id }
+      });
+
+      if (!apiSettings) {
+        throw new Error(systemResponses.EN.API_KEY_NOT_FOUND);
+      }
+
+      return {
+        access_token: this.jwtService.sign(payload),
+        api_key: apiSettings.apiKey,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          organisation: user.organisation,
+          role: user.role,
+          walletAddress: user.walletAddress
+        },
+        message: systemResponses.EN.LOGIN_SUCCESS
+      };
+    } catch (error) {
+      if (error.message === systemResponses.EN.API_KEY_NOT_FOUND) {
+        throw new BadRequestException(error.message);
+      }
+      throw new BadRequestException(systemResponses.EN.AUTH_ERROR);
+    }
   }
 
-  async register(userData: RegisterDto) {
-    const existingUser = await this.userRepository.findByEmail(userData.email);
-    if (existingUser) {
-      throw new Error(systemResponses.EN.USER_EMAIL_EXISTS);
+  async register(registerDto: RegisterDto): Promise<RegisterResponse> {
+    try {
+      const existingUser = await this.userRepository.findByEmail(registerDto.email);
+      if (existingUser) {
+        throw new Error(systemResponses.EN.USER_EMAIL_EXISTS);
+      }
+
+      const userId = this.walletService.generateUserId();
+      const otp = this.generateOTP();
+      const otpExpiry = new Date(Date.now() + 15 * 60 * 1000);
+
+      const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+      const { address: walletAddress, encryptedPrivateKey, iv } = 
+        await this.walletService.generateWallet();
+
+      const newUser = await this.userRepository.create(
+        {
+          id: userId,
+          ...registerDto,
+          password: hashedPassword,
+          otp,
+          otpExpiry,
+        },
+        walletAddress
+      );
+
+      // Generate API key
+      const apiKey = generateApiKey();
+
+      // Create API settings with the generated key
+      await this.prisma.apiSettings.create({
+        data: {
+          userId: newUser.id,
+          apiKey,
+          apiAccess: true,
+          webhookNotifications: false,
+        },
+      }).catch(() => {
+        throw new Error(systemResponses.EN.API_KEY_ALREADY_EXISTS);
+      });
+
+      // Create wallet
+      const wallet = await this.walletService.createWallet(userId);
+
+      await this.sendVerificationEmail(registerDto.email, otp);
+
+      const { password, otp: _, otpExpiry: __, ...result } = newUser;
+      return {
+        user: result,
+        wallet: {
+          address: walletAddress,
+          encryptedPrivateKey,
+          iv,
+        },
+        apiKey,
+        message: systemResponses.EN.USER_CREATED
+      };
+    } catch (error) {
+      if (error.message === systemResponses.EN.API_KEY_ALREADY_EXISTS) {
+        throw new BadRequestException(error.message);
+      }
+      throw new BadRequestException(systemResponses.EN.USER_CREATION_ERROR);
     }
-
-    const userId = this.walletService.generateUserId();
-    const otp = this.generateOTP();
-    const otpExpiry = new Date(Date.now() + 15 * 60 * 1000);
-
-    const hashedPassword = await bcrypt.hash(userData.password, 10);
-    const { address: walletAddress, encryptedPrivateKey, iv } = 
-      await this.walletService.generateWallet();
-
-    const newUser = await this.userRepository.create(
-      {
-        id: userId,
-        ...userData,
-        password: hashedPassword,
-        otp,
-        otpExpiry,
-      },
-      walletAddress
-    );
-
-    await this.sendVerificationEmail(userData.email, otp);
-
-    const { password, otp: _, otpExpiry: __, ...result } = newUser;
-    return {
-      user: result,
-      wallet: {
-        address: walletAddress,
-        encryptedPrivateKey,
-        iv,
-      },
-      message: systemResponses.EN.OTP_SENT
-    };
   }
 
   async verifyOTP(verifyOtpDto: VerifyOtpDto) {

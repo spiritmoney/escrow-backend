@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Body, UseGuards, Query, BadRequestException, NotFoundException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiSecurity } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { BalanceService } from '../services/balance.service';
@@ -7,10 +7,12 @@ import { ConversionService } from '../services/conversion.service';
 import { SendMoneyDto, RequestPaymentDto } from '../dto/balance.dto';
 import { ConvertCurrencyDto, ConversionResponse } from '../dto/conversion.dto';
 import { systemResponses } from '../../contracts/system.responses';
+import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
 
 @ApiTags('balance')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@ApiSecurity('x-api-key')
+@UseGuards(CombinedAuthGuard)
 @Controller('balance')
 export class BalanceController {
   constructor(

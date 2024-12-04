@@ -134,8 +134,6 @@ export class BalanceService implements IBalanceService {
       where: { userId: sender.id },
       select: {
         address: true,
-        encryptedPrivateKey: true,
-        iv: true,
       },
     });
 
@@ -148,9 +146,7 @@ export class BalanceService implements IBalanceService {
       const txReceipt = await this.walletService.transferESP(
         senderWallet.address,
         transferDetails.recipientAddress,
-        transferDetails.amount,
-        senderWallet.encryptedPrivateKey,
-        senderWallet.iv
+        BigInt(transferDetails.amount)
       );
 
       // Update local balance records
@@ -174,7 +170,7 @@ export class BalanceService implements IBalanceService {
             type: 'CRYPTO',
             status: 'COMPLETED',
             note: transferDetails.note,
-            txHash: txReceipt.hash, // Store blockchain transaction hash
+            txHash: txReceipt.hash,
           },
         }),
       ]);
@@ -225,5 +221,27 @@ export class BalanceService implements IBalanceService {
       message: 'Payment request created successfully',
       requestId: paymentRequest.id,
     };
+  }
+
+  async transferCrypto(senderId: string, recipientAddress: string, amount: number) {
+    try {
+      const senderWallet = await this.prisma.wallet.findFirst({
+        where: { userId: senderId }
+      });
+
+      if (!senderWallet) {
+        throw new BadRequestException(systemResponses.EN.WALLET_NOT_FOUND);
+      }
+
+      const txReceipt = await this.walletService.transferESP(
+        senderWallet.address,
+        recipientAddress,
+        BigInt(amount)
+      );
+
+      return txReceipt;
+    } catch (error) {
+      throw new BadRequestException(systemResponses.EN.CRYPTO_TRANSFER_FAILED);
+    }
   }
 } 

@@ -1,7 +1,7 @@
 export interface IAuthService {
   validateUser(email: string, password: string): Promise<any>;
   login(user: any): Promise<LoginResponse>;
-  register(userData: any): Promise<RegisterResponse>;
+  register(userData: RegisterDto): Promise<RegisterResponse>;
   verifyOTP(verifyOtpDto: any): Promise<{ message: string }>;
   requestPasswordReset(email: string): Promise<{ message: string }>;
   resetPassword(resetPasswordDto: any): Promise<{ message: string }>;
@@ -19,6 +19,7 @@ export interface IUserRepository {
 
 export interface LoginResponse {
   access_token: string;
+  api_key?: string;
   user: {
     id: string;
     email: string;
@@ -45,5 +46,16 @@ export interface RegisterResponse {
     encryptedPrivateKey: string;
     iv: string;
   };
+  apiKey: string;
   message: string;
+}
+
+export interface RegisterDto {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  country: string;
+  organisation: string;
+  role: string;
 } 

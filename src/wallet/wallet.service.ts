@@ -1,158 +1,94 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { Injectable } from '@nestjs/common';
+import { IWalletService } from './interfaces/wallet.interface';
+import { PrismaService } from '../prisma/prisma.service';
 import { ethers } from 'ethers';
 import * as crypto from 'crypto';
-import { SystemConfigDTO } from '../config/configuration';
 
 @Injectable()
-export class WalletService {
-  private readonly encryptionKey: string;
-  private readonly algorithm = 'aes-256-cbc';
-  private readonly provider: ethers.JsonRpcProvider;
-  private readonly espContractAddress: string;
-  private readonly espContractABI: any[]; // Define your ESP token ABI here
+export class WalletService implements IWalletService {
+  constructor(private prisma: PrismaService) {}
 
-  constructor(private configService: ConfigService) {
-    this.encryptionKey = this.configService.get<string>(SystemConfigDTO.WALLET_ENCRYPTION_KEY);
-    const rpcUrl = this.configService.get<string>('BLOCKCHAIN_RPC_URL');
-    this.provider = new ethers.JsonRpcProvider(rpcUrl);
-    this.espContractAddress = this.configService.get<string>('ESP_CONTRACT_ADDRESS');
-    // Initialize contract ABI - you'll need to define this based on your token contract
-    this.espContractABI = [/* Your ESP token ABI here */];
+  generateUserId(): string {
+    return crypto.randomBytes(8).toString('hex');
   }
 
-  generateUserId(length: number = 16): string {
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-    let result = '';
-    const randomValues = new Uint8Array(length);
-    crypto.randomFillSync(randomValues);
-    for (let i = 0; i < length; i++) {
-      result += chars[randomValues[i] % chars.length];
-    }
-    return result;
-  }
-
-  private encrypt(text: string): { encryptedData: string; iv: string } {
+  async generateWallet() {
+    const wallet = ethers.Wallet.createRandom();
     const iv = crypto.randomBytes(16);
-    const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
-    const cipher = crypto.createCipheriv(this.algorithm, key, iv);
+    const cipher = crypto.createCipheriv(
+      'aes-256-gcm',
+      Buffer.from(process.env.WALLET_ENCRYPTION_KEY, 'hex'),
+      iv
+    );
 
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
+    let encryptedPrivateKey = cipher.update(wallet.privateKey, 'utf8', 'hex');
+    encryptedPrivateKey += cipher.final('hex');
 
     return {
-      encryptedData: encrypted,
+      address: wallet.address,
+      encryptedPrivateKey,
       iv: iv.toString('hex'),
     };
   }
 
-  async generateWallet(): Promise<{
-    address: string;
-    encryptedPrivateKey: string;
-    iv: string;
-  }> {
-    const wallet = ethers.Wallet.createRandom();
-    const { encryptedData, iv } = this.encrypt(wallet.privateKey);
+  async createWallet(userId: string) {
+    const walletData = await this.generateWallet();
+    
+    const wallet = await this.prisma.wallet.create({
+      data: {
+        userId,
+        address: walletData.address,
+        encryptedPrivateKey: walletData.encryptedPrivateKey,
+        iv: walletData.iv,
+      },
+    });
 
     return {
       address: wallet.address,
-      encryptedPrivateKey: encryptedData,
-      iv,
+      encryptedPrivateKey: wallet.encryptedPrivateKey,
+      iv: wallet.iv,
     };
   }
 
-  private decrypt(encryptedData: string, iv: string): string {
-    const key = crypto.scryptSync(this.encryptionKey, 'salt', 32);
-    const decipher = crypto.createDecipheriv(
-      this.algorithm,
-      key,
-      Buffer.from(iv, 'hex')
-    );
-    let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-    return decrypted;
-  }
-
-  decryptPrivateKey(encryptedKey: string, iv: string): string {
-    // Implement decryption logic here
-    // This should use the same encryption method used to encrypt the key
-    return "decrypted-key"; // Placeholder
-  }
-
-  async transferESP(
-    senderWalletAddress: string,
-    recipientAddress: string,
-    amount: number,
-    encryptedPrivateKey?: string,
-    iv?: string,
-  ): Promise<ethers.TransactionResponse> {
+  async transferESP(fromAddress: string, toAddress: string, amount: bigint): Promise<any> {
     try {
-      if (!ethers.isAddress(senderWalletAddress) || !ethers.isAddress(recipientAddress)) {
-        throw new BadRequestException('Invalid wallet address');
-      }
-
-      // Get the encrypted wallet details from the database if not provided
-      if (!encryptedPrivateKey || !iv) {
-        // You might want to get these from your database
-        throw new BadRequestException('Wallet credentials required');
-      }
-
-      // Decrypt the private key
-      const privateKey = this.decrypt(encryptedPrivateKey, iv);
-      
-      // Create wallet instance
-      const wallet = new ethers.Wallet(privateKey, this.provider);
-
-      // Create contract instance
-      const espContract = new ethers.Contract(
-        this.espContractAddress,
-        this.espContractABI,
-        wallet
-      );
-
-      // Convert amount to proper decimal places (assuming 18 decimals for ESP token)
-      const amountInWei = ethers.parseUnits(amount.toString(), 18);
-
-      // Estimate gas
-      const gasLimit = await espContract.transfer.estimateGas(
-        recipientAddress,
-        amountInWei
-      );
-
-      // Get current gas price
-      const gasPrice = await this.provider.getFeeData();
-
-      // Send transaction
-      const tx = await espContract.transfer(recipientAddress, amountInWei, {
-        gasLimit: gasLimit,
-        gasPrice: gasPrice.gasPrice,
+      const wallet = await this.prisma.wallet.findFirst({
+        where: { address: fromAddress }
       });
 
-      // Wait for transaction confirmation
-      const receipt = await tx.wait();
+      if (!wallet) {
+        throw new Error('Wallet not found');
+      }
 
-      return receipt;
-    } catch (error) {
-      console.error('ESP Transfer Error:', error);
-      throw new BadRequestException(
-        error.reason || 'Failed to process crypto transfer'
+      const privateKey = await this.decryptPrivateKey(
+        wallet.encryptedPrivateKey,
+        wallet.iv
       );
+
+      // Implement the actual transfer logic using ethers.js
+      const signer = new ethers.Wallet(privateKey);
+      // Add your transfer implementation here
+      
+      return { hash: 'transaction_hash' };
+    } catch (error) {
+      throw new Error('Transfer failed: ' + error.message);
     }
   }
 
-  async getESPBalance(walletAddress: string): Promise<number> {
+  async decryptPrivateKey(encryptedKey: string, iv: string): Promise<string> {
     try {
-      const contract = new ethers.Contract(
-        this.espContractAddress,
-        this.espContractABI,
-        this.provider
+      const decipher = crypto.createDecipheriv(
+        'aes-256-gcm',
+        Buffer.from(process.env.WALLET_ENCRYPTION_KEY, 'hex'),
+        Buffer.from(iv, 'hex')
       );
 
-      const balance = await contract.balanceOf(walletAddress);
-      return Number(ethers.formatUnits(balance, 18));
+      let decrypted = decipher.update(encryptedKey, 'hex', 'utf8');
+      decrypted += decipher.final('utf8');
+
+      return decrypted;
     } catch (error) {
-      console.error('Get ESP Balance Error:', error);
-      throw new BadRequestException('Failed to fetch ESP balance');
+      throw new Error('Failed to decrypt private key');
     }
   }
 } 

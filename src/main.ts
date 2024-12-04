@@ -11,17 +11,22 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const port = configService.get<number>('port');
   
-  // CORS Configuration
+  // Updated CORS Configuration
   app.enableCors({
     origin: [
-      'http://localhost:3000',      // Local development
-      'http://localhost:5173',      // Vite default
-      'https://espeespay.vercel.app', // Production frontend
-      /\.vercel\.app$/,            // Any Vercel deployment
+      'http://localhost:3000',      
+      'http://localhost:5173',      
+      'https://espeespay.vercel.app',
+      /\.vercel\.app$/,            
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+    allowedHeaders: [
+      'Content-Type', 
+      'Authorization', 
+      'X-Requested-With',
+      'X-API-Key'
+    ],
   });
   
   // Swagger Configuration
@@ -31,6 +36,7 @@ async function bootstrap() {
     .setVersion('1.0')
     .addTag('auth', 'Authentication endpoints')
     .addBearerAuth()
+    .addApiKey({ type: 'apiKey', in: 'header', name: 'x-api-key' }, 'x-api-key')
     .build();
     
   const document = SwaggerModule.createDocument(app, config);

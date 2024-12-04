@@ -59,6 +59,9 @@ export const systemResponses = {
     PROFILE_UPDATE_ERROR: 'Error updating profile',
     PROFILE_RETRIEVAL_ERROR: 'Error retrieving profile',
     PROFILE_NOT_FOUND: 'Profile not found',
+    PROFILE_UPDATED: 'Profile updated successfully',
+    SECURITY_SETTINGS_UPDATED: 'Security settings updated successfully',
+    PHOTO_NOT_FOUND: 'Profile photo not found',
 
     // Balance Related
     INSUFFICIENT_BALANCE: 'Insufficient balance for this transaction',
@@ -142,5 +145,60 @@ export const systemResponses = {
     INVALID_BANK_SELECTED: 'Invalid bank selected. Please choose from the supported banks list',
     DEFAULT_PAYMENT_METHOD_UPDATED: 'Default payment method updated successfully',
     AUTO_PAYMENT_SETTINGS_UPDATED: 'Auto-payment settings updated successfully',
+
+    // API Key Related
+    API_KEY_GENERATED: 'API key generated successfully',
+    API_KEY_REGENERATED: 'API key regenerated successfully',
+    API_KEY_REVOKED: 'API key revoked successfully',
+    API_KEY_INVALID: 'Invalid API key',
+    API_KEY_DISABLED: 'API key is disabled',
+    API_KEY_REQUIRED: 'API key is required',
+    API_KEY_FETCH_ERROR: 'Error fetching API key',
+    API_KEY_UPDATE_ERROR: 'Error updating API key',
+    API_KEY_ALREADY_EXISTS: 'API key already exists for this user',
+    API_KEY_NOT_FOUND: 'API key not found',
+    API_ACCESS_DISABLED: 'API access is disabled for this account',
+    API_SETTINGS_UPDATED: 'API settings updated successfully',
+    API_SETTINGS_UPDATE_FAILED: 'Failed to update API settings',
+
+    // Authentication Related (Additional)
+    INVALID_CREDENTIALS_OR_API_KEY: 'Invalid credentials or API key',
+    AUTHENTICATION_METHOD_REQUIRED: 'Either JWT token or API key is required for authentication',
+    API_KEY_AUTHENTICATION_FAILED: 'API key authentication failed',
+    JWT_AUTHENTICATION_FAILED: 'JWT authentication failed',
+
+    // Profile Related (Additional)
+    API_SETTINGS_FETCH_ERROR: 'Error fetching API settings',
+    API_KEY_VISIBILITY_UPDATED: 'API key visibility updated',
+    API_KEY_PERMISSIONS_UPDATED: 'API key permissions updated',
+    API_KEY_RATE_LIMIT_EXCEEDED: 'API rate limit exceeded',
+
+    // Profile Photo Related
+    PHOTO_UPDATED: 'Profile photo updated successfully',
+    PHOTO_UPDATE_FAILED: 'Failed to update profile photo',
+    PHOTO_DELETED: 'Profile photo deleted successfully',
+    PHOTO_DELETE_FAILED: 'Failed to delete profile photo',
+    INVALID_PHOTO_FORMAT: 'Invalid photo format. Please upload a valid image file',
+    PHOTO_SIZE_TOO_LARGE: 'Photo size exceeds maximum limit',
+    PHOTO_UPLOAD_ERROR: 'Error uploading photo',
+
+    // File Upload Related
+    FILE_UPLOAD_SUCCESS: 'File uploaded successfully',
+    FILE_UPLOAD_FAILED: 'Failed to upload file',
+    FILE_DELETE_SUCCESS: 'File deleted successfully',
+    FILE_DELETE_FAILED: 'Failed to delete file',
+    FILE_NOT_FOUND: 'File not found',
+    FILE_TOO_LARGE: 'File size exceeds the maximum limit of 5MB',
+    INVALID_FILE_TYPE: 'Invalid file type. Only JPEG, PNG, and GIF files are allowed',
+    FILE_PROCESSING_ERROR: 'Error processing file',
+    FILE_STORAGE_ERROR: 'Error storing file',
+    FILE_RETRIEVAL_ERROR: 'Error retrieving file',
+
+    // Cloudinary Specific
+    CLOUDINARY_CONFIG_ERROR: 'Error configuring Cloudinary',
+    CLOUDINARY_UPLOAD_ERROR: 'Error uploading to Cloudinary',
+    CLOUDINARY_DELETE_ERROR: 'Error deleting from Cloudinary',
+    CLOUDINARY_TRANSFORM_ERROR: 'Error transforming image',
+    CLOUDINARY_CONNECTION_ERROR: 'Error connecting to Cloudinary',
   },
 }; 

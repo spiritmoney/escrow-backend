@@ -35,6 +35,11 @@ model User {
   paymentMethods     PaymentMethod[]
   autoPaymentSettings AutoPaymentSettings?
   billingHistory     BillingHistory[]
+  phone           String?
+  photoUrl        String?
+  twoFactorEnabled Boolean  @default(false)
+  apiSettings     ApiSettings?
+  kycVerification KycVerification?
 
   @@map("users")
 }
@@ -227,4 +232,27 @@ model SubscriptionUsage {
   subscription       Subscription @relation(fields: [subscriptionId], references: [id])
 
   @@map("subscription_usage")
+}
+
+model ApiSettings {
+  id                   String    @id @default(cuid())
+  userId               String    @unique
+  user                 User      @relation(fields: [userId], references: [id])
+  apiKey               String?
+  apiAccess            Boolean   @default(false)
+  webhookNotifications Boolean   @default(false)
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+model KycVerification {
+  id               String    @id @default(cuid())
+  userId           String    @unique
+  user             User      @relation(fields: [userId], references: [id])
+  level            String    @default("Level 1")
+  transactionLimit Float     @default(1000)
+  verificationStatus String  @default("PENDING")
+  documents        Json?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 } 

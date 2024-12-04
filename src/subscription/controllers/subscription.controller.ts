@@ -1,13 +1,15 @@
 import { Controller, Get, Post, Body, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiSecurity } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { SubscriptionService } from '../services/subscription.service';
 import { UpdateSubscriptionDto, SubscriptionPlan } from '../dto/subscription.dto';
+import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
 
 @ApiTags('subscription')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@ApiSecurity('x-api-key')
+@UseGuards(CombinedAuthGuard)
 @Controller('subscription')
 export class SubscriptionController {
   constructor(private subscriptionService: SubscriptionService) {}

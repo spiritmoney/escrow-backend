@@ -1,5 +1,5 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiSecurity } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { PaymentMethodService } from '../services/payment-method.service';
@@ -9,10 +9,12 @@ import {
   BankTransferMethodDto, 
   AutoPaymentSettingsDto 
 } from '../dto/payment-method.dto';
+import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
 
 @ApiTags('billing')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
+@ApiSecurity('x-api-key')
+@UseGuards(CombinedAuthGuard)
 @Controller('billing')
 export class BillingController {
   constructor(

@@ -268,7 +268,7 @@ export class PaymentLinkTransactionService {
     }
 
     // Get buyer's private key
-    const privateKey = this.walletService.decryptPrivateKey(
+    const privateKey = await this.walletService.decryptPrivateKey(
       transaction.sender.wallet.encryptedPrivateKey,
       transaction.sender.wallet.iv
     );

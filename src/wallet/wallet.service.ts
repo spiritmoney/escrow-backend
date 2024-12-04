@@ -15,18 +15,25 @@ export class WalletService implements IWalletService {
   async generateWallet() {
     const wallet = ethers.Wallet.createRandom();
     const iv = crypto.randomBytes(16);
+
+    const encryptionKey = process.env.WALLET_ENCRYPTION_KEY;
+    if (!encryptionKey || Buffer.from(encryptionKey, 'hex').length !== 32) {
+      throw new Error('WALLET_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)');
+    }
+
     const cipher = crypto.createCipheriv(
       'aes-256-gcm',
-      Buffer.from(process.env.WALLET_ENCRYPTION_KEY, 'hex'),
+      Buffer.from(encryptionKey, 'hex'),
       iv
     );
 
     let encryptedPrivateKey = cipher.update(wallet.privateKey, 'utf8', 'hex');
     encryptedPrivateKey += cipher.final('hex');
+    const authTag = cipher.getAuthTag();
 
     return {
       address: wallet.address,
-      encryptedPrivateKey,
+      encryptedPrivateKey: encryptedPrivateKey + authTag.toString('hex'),
       iv: iv.toString('hex'),
     };
   }
@@ -77,17 +84,33 @@ export class WalletService implements IWalletService {
 
   async decryptPrivateKey(encryptedKey: string, iv: string): Promise<string> {
     try {
+      const encryptionKey = process.env.WALLET_ENCRYPTION_KEY;
+      if (!encryptionKey || Buffer.from(encryptionKey, 'hex').length !== 32) {
+        throw new Error('WALLET_ENCRYPTION_KEY must be a 64-character hex string (32 bytes)');
+      }
+
+      // Split the encrypted data and auth tag
+      const authTagLength = 32; // 16 bytes = 32 hex characters
+      const authTag = Buffer.from(
+        encryptedKey.slice(-authTagLength), 
+        'hex'
+      );
+      const encryptedData = encryptedKey.slice(0, -authTagLength);
+
       const decipher = crypto.createDecipheriv(
         'aes-256-gcm',
-        Buffer.from(process.env.WALLET_ENCRYPTION_KEY, 'hex'),
+        Buffer.from(encryptionKey, 'hex'),
         Buffer.from(iv, 'hex')
       );
 
-      let decrypted = decipher.update(encryptedKey, 'hex', 'utf8');
+      decipher.setAuthTag(authTag);
+
+      let decrypted = decipher.update(encryptedData, 'hex', 'utf8');
       decrypted += decipher.final('utf8');
 
       return decrypted;
     } catch (error) {
+      console.error('Decryption error:', error);
       throw new Error('Failed to decrypt private key');
     }
   }

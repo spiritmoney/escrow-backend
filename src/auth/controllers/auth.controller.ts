@@ -73,8 +73,8 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @UseGuards(LocalAuthGuard)
   @Post('login')
-  async login(@Body() loginDto: LoginDto) {
-    return this.authService.login(loginDto);
+  async login(@CurrentUser() user) {
+    return this.authService.login(user);
   }
 
   @ApiOperation({ summary: 'Verify email with OTP' })

@@ -1,13 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
-import { systemResponses } from '../../contracts/system.responses';
-
-interface EmailOptions {
-  to: string[];
-  subject: string;
-  html: string;
-}
+import { SystemConfigDTO } from '../../config/configuration';
 
 @Injectable()
 export class NodemailerService {
@@ -15,30 +9,50 @@ export class NodemailerService {
   public readonly supportEmail: string;
 
   constructor(private configService: ConfigService) {
-    this.supportEmail = this.configService.get<string>('SUPPORT_EMAIL') || 'support@espeepay.com';
-    
     this.transporter = nodemailer.createTransport({
-      host: this.configService.get('SMTP_HOST'),
-      port: this.configService.get('SMTP_PORT'),
-      secure: true,
+      service: 'gmail',
+      host: 'smtp.gmail.com',
+      port: 587,
+      secure: false, // true for 465, false for other ports
       auth: {
-        user: this.configService.get('SMTP_USER'),
-        pass: this.configService.get('SMTP_PASSWORD'),
+        user: this.configService.get<string>(SystemConfigDTO.SMTP_USER),
+        pass: this.configService.get<string>(SystemConfigDTO.SMTP_PASSWORD),
       },
     });
+
+    // Initialize support email from config
+    this.supportEmail = this.configService.get<string>(SystemConfigDTO.SUPPORT_EMAIL);
   }
 
-  async sendEmail(options: EmailOptions): Promise<void> {
+  async sendEmail(options: {
+    to: string[];
+    subject: string;
+    html: string;
+  }): Promise<boolean> {
     try {
-      await this.transporter.sendMail({
-        from: this.configService.get('SMTP_FROM_ADDRESS'),
-        to: options.to.join(', '),
+      const mailOptions = {
+        from: this.configService.get<string>(SystemConfigDTO.SMTP_FROM),
+        to: options.to.join(','),
         subject: options.subject,
         html: options.html,
-      });
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+      console.log('Email sent successfully:', info.messageId);
+      return true;
     } catch (error) {
-      console.error('Email send error:', error);
-      throw new Error(systemResponses.EN.EMAIL_SEND_ERROR);
+      console.error('Email sending failed:', error);
+      throw new Error(`Failed to send email: ${error.message}`);
+    }
+  }
+
+  async verifyConnection(): Promise<boolean> {
+    try {
+      await this.transporter.verify();
+      return true;
+    } catch (error) {
+      console.error('Email configuration error:', error);
+      return false;
     }
   }
 } 

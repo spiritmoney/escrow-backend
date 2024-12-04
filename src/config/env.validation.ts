@@ -1,5 +1,5 @@
 import { plainToClass } from 'class-transformer';
-import { IsString, IsNumber, validateSync, IsEmail, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNumber, validateSync, IsEmail, IsNotEmpty, IsOptional, MinLength, MaxLength, Matches } from 'class-validator';
 
 class EnvironmentVariables {
   @IsString()
@@ -26,14 +26,18 @@ class EnvironmentVariables {
   WALLET_ENCRYPTION_KEY: string;
 
   @IsEmail()
+  @IsNotEmpty()
   SMTP_USER: string;
 
   @IsString()
   @IsNotEmpty()
+  @MinLength(16)
+  @MaxLength(16)
   SMTP_PASSWORD: string;
 
   @IsString()
   @IsNotEmpty()
+  @Matches(/^.*<.*@.*>$/)
   SMTP_FROM: string;
 
   @IsString()

@@ -14,6 +14,7 @@ export class SystemConfigDTO {
   static SMTP_FROM = 'SMTP_FROM';
   static SMTP_HOST = 'SMTP_HOST';
   static SMTP_PORT = 'SMTP_PORT';
+  static SUPPORT_EMAIL = 'SUPPORT_EMAIL';
   
   // Environment
   static NODE_ENV = 'NODE_ENV';
@@ -33,7 +34,7 @@ export interface EnvironmentConfig {
 }
 
 export default () => ({
-  port: parseInt(process.env.PORT, 10) || 3000,
+  port: parseInt(process.env.PORT, 10) || 10000,
   jwtExpiresIn: '1d',
   isProduction: process.env.NODE_ENV === 'production',
   isDevelopment: process.env.NODE_ENV === 'development',

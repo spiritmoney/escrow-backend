@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, OnModuleInit } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
@@ -88,12 +88,18 @@ const CloudinaryProvider = {
     PassportModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
-        secret: configService.get<string>(SystemConfigDTO.JWT_SECRET),
-        signOptions: { 
-          expiresIn: configService.get('jwtExpiresIn'),
-        },
-      }),
+      useFactory: async (configService: ConfigService) => {
+        const secret = configService.get<string>(SystemConfigDTO.JWT_SECRET);
+        if (!secret || secret.length < 32) {
+          throw new Error('JWT_SECRET must be at least 32 characters long');
+        }
+        return {
+          secret,
+          signOptions: { 
+            expiresIn: configService.get('jwtExpiresIn') || '24h',
+          },
+        };
+      },
       inject: [ConfigService],
     }),
   ],
@@ -153,4 +159,14 @@ const CloudinaryProvider = {
     LiveChatService,
   ],
 })
-export class AppModule {}
+export class AppModule implements OnModuleInit {
+  constructor(private nodeMailerService: NodemailerService) {}
+
+  async onModuleInit() {
+    // Verify email configuration
+    const emailConfigValid = await this.nodeMailerService.verifyConnection();
+    if (!emailConfigValid) {
+      console.error('Email configuration is invalid. Please check your SMTP settings.');
+    }
+  }
+}

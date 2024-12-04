@@ -25,22 +25,31 @@ export class AuthService implements IAuthService {
   }
 
   private async sendVerificationEmail(email: string, otp: string) {
-    await this.emailService.sendEmail({
-      to: [email],
-      subject: 'Email Verification - EspeePay',
-      html: `
-        <h1>Email Verification</h1>
-        <p>Your verification code is: <strong>${otp}</strong></p>
-        <p>This code will expire in 15 minutes.</p>
-        <p>If you didn't request this code, please ignore this email.</p>
-      `,
-    });
+    try {
+      await this.emailService.sendEmail({
+        to: [email],
+        subject: 'Email Verification - EscrowPay',
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h1 style="color: #333;">Email Verification</h1>
+            <p>Your verification code is: <strong style="font-size: 24px; color: #4CAF50;">${otp}</strong></p>
+            <p>This code will expire in 15 minutes.</p>
+            <p style="color: #666;">If you didn't request this code, please ignore this email.</p>
+            <hr>
+            <p style="font-size: 12px; color: #999;">This is an automated message, please do not reply.</p>
+          </div>
+        `,
+      });
+    } catch (error) {
+      console.error('Failed to send verification email:', error);
+      throw new Error('Failed to send verification email. Please try again later.');
+    }
   }
 
   private async sendPasswordResetEmail(email: string, otp: string) {
     await this.emailService.sendEmail({
       to: [email],
-      subject: 'Password Reset Request - EspeePay',
+      subject: 'Password Reset Request - Escrow Pay',
       html: `
         <h1>Password Reset Request</h1>
         <p>Your password reset code is: <strong>${otp}</strong></p>
@@ -110,51 +119,58 @@ export class AuthService implements IAuthService {
 
   async register(registerDto: RegisterDto): Promise<RegisterResponse> {
     try {
+      // Check for existing user
       const existingUser = await this.userRepository.findByEmail(registerDto.email);
       if (existingUser) {
-        throw new Error(systemResponses.EN.USER_EMAIL_EXISTS);
+        throw new BadRequestException(systemResponses.EN.USER_EMAIL_EXISTS);
       }
 
+      // Generate user ID and wallet
       const userId = this.walletService.generateUserId();
       const otp = this.generateOTP();
       const otpExpiry = new Date(Date.now() + 15 * 60 * 1000);
-
       const hashedPassword = await bcrypt.hash(registerDto.password, 10);
+      
+      // Generate wallet details
       const { address: walletAddress, encryptedPrivateKey, iv } = 
         await this.walletService.generateWallet();
 
-      const newUser = await this.userRepository.create(
-        {
-          id: userId,
-          ...registerDto,
-          password: hashedPassword,
-          otp,
-          otpExpiry,
-        },
-        walletAddress
-      );
+      // Create user transaction
+      const newUser = await this.prisma.$transaction(async (prisma) => {
+        // Create user
+        const user = await this.userRepository.create(
+          {
+            id: userId,
+            ...registerDto,
+            password: hashedPassword,
+            otp,
+            otpExpiry,
+          },
+          walletAddress
+        );
 
-      // Generate API key
-      const apiKey = generateApiKey();
+        // Generate and create API key
+        const apiKey = generateApiKey();
+        await prisma.apiSettings.create({
+          data: {
+            userId: user.id,
+            apiKey,
+            apiAccess: true,
+            webhookNotifications: false,
+          },
+        });
 
-      // Create API settings with the generated key
-      await this.prisma.apiSettings.create({
-        data: {
-          userId: newUser.id,
-          apiKey,
-          apiAccess: true,
-          webhookNotifications: false,
-        },
-      }).catch(() => {
-        throw new Error(systemResponses.EN.API_KEY_ALREADY_EXISTS);
+        // Create wallet
+        await this.walletService.createWallet(userId);
+
+        return { user, apiKey };
       });
 
-      // Create wallet
-      const wallet = await this.walletService.createWallet(userId);
-
+      // Send verification email
       await this.sendVerificationEmail(registerDto.email, otp);
 
-      const { password, otp: _, otpExpiry: __, ...result } = newUser;
+      const { password, otp: _, otpExpiry: __, ...result } = newUser.user;
+      
       return {
         user: result,
         wallet: {
@@ -162,14 +178,24 @@ export class AuthService implements IAuthService {
           encryptedPrivateKey,
           iv,
         },
-        apiKey,
+        apiKey: newUser.apiKey,
         message: systemResponses.EN.USER_CREATED
       };
+
     } catch (error) {
-      if (error.message === systemResponses.EN.API_KEY_ALREADY_EXISTS) {
-        throw new BadRequestException(error.message);
+      console.error('Registration error:', error);
+
+      if (error instanceof BadRequestException) {
+        throw error;
       }
-      throw new BadRequestException(systemResponses.EN.USER_CREATION_ERROR);
+
+      if (error.code === 'P2002') {
+        throw new BadRequestException(systemResponses.EN.USER_EMAIL_EXISTS);
+      }
+
+      throw new BadRequestException(
+        error.message || systemResponses.EN.USER_CREATION_ERROR
+      );
     }
   }
 

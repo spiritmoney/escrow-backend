@@ -1,4 +1,4 @@
-import { Injectable, ConflictException } from '@nestjs/common';
+import { Injectable, ConflictException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { IUserRepository } from '../interfaces/auth.interface';
 import { RegisterDto } from '../dto/auth.dto';
@@ -33,10 +33,11 @@ export class UserRepository implements IUserRepository {
         },
       });
     } catch (error) {
+      console.error('User creation error:', error);
       if (error.code === 'P2002') {
-        throw new Error(systemResponses.EN.USER_EMAIL_EXISTS);
+        throw new BadRequestException(systemResponses.EN.USER_EMAIL_EXISTS);
       }
-      throw error;
+      throw new BadRequestException(error.message || 'Error creating user');
     }
   }
 

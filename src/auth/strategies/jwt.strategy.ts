@@ -11,10 +11,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     private userRepository: UserRepository,
     private configService: ConfigService,
   ) {
+    const secret = configService.get<string>(SystemConfigDTO.JWT_SECRET);
+    if (!secret || secret.length < 32) {
+      throw new Error('JWT_SECRET must be at least 32 characters long');
+    }
+    
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>(SystemConfigDTO.JWT_SECRET),
+      secretOrKey: secret,
     });
   }
 

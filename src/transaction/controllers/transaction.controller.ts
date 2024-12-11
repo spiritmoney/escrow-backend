@@ -12,12 +12,10 @@ import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { TransactionService } from '../services/transaction.service';
 import { GetTransactionsQueryDto, TransactionType, TransactionStatus } from '../dto/transaction.dto';
 import { systemResponses } from '../../contracts/system.responses';
-import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
 
 @ApiTags('transactions')
 @ApiBearerAuth()
-@ApiSecurity('x-api-key')
-@UseGuards(CombinedAuthGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('transactions')
 export class TransactionController {
   constructor(private transactionService: TransactionService) {}

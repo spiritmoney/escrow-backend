@@ -1280,9 +1280,11 @@
               "application/json": {
                 "schema": {
                   "example": {
-                    "fullName": "John Doe",
+                    "firstName": "John",
+                    "lastName": "Doe",
                     "email": "john@example.com",
                     "phone": "+1 234 567 8900",
+                    "organisation": "Acme Corp",
                     "kycLevel": "Level 1",
                     "transactionLimit": "$1,000/day",
                     "apiKey": "********",
@@ -1296,9 +1298,6 @@
           }
         },
         "security": [
-          {
-            "x-api-key": []
-          },
           {
             "bearer": []
           }
@@ -1330,9 +1329,6 @@
         },
         "security": [
           {
-            "x-api-key": []
-          },
-          {
             "bearer": []
           }
         ],
@@ -1352,9 +1348,6 @@
           }
         },
         "security": [
-          {
-            "x-api-key": []
-          },
           {
             "bearer": []
           }
@@ -1376,9 +1369,6 @@
           }
         },
         "security": [
-          {
-            "x-api-key": []
-          },
           {
             "bearer": []
           }
@@ -1410,9 +1400,6 @@
         },
         "security": [
           {
-            "x-api-key": []
-          },
-          {
             "bearer": []
           }
         ],
@@ -1443,9 +1430,6 @@
         },
         "security": [
           {
-            "x-api-key": []
-          },
-          {
             "bearer": []
           }
         ],
@@ -1465,9 +1449,6 @@
           }
         },
         "security": [
-          {
-            "x-api-key": []
-          },
           {
             "bearer": []
           }
@@ -1499,9 +1480,6 @@
           }
         },
         "security": [
-          {
-            "x-api-key": []
-          },
           {
             "bearer": []
           }
@@ -2368,21 +2346,6 @@
       "UpdateProfileDto": {
         "type": "object",
         "properties": {
-          "firstName": {
-            "type": "string",
-            "example": "John",
-            "description": "User first name"
-          },
-          "lastName": {
-            "type": "string",
-            "example": "Doe",
-            "description": "User last name"
-          },
-          "email": {
-            "type": "string",
-            "example": "john@example.com",
-            "description": "User email address"
-          },
           "phone": {
             "type": "string",
             "example": "+1 234 567 8900",
@@ -2395,9 +2358,6 @@
           }
         },
         "required": [
-          "firstName",
-          "lastName",
-          "email",
           "phone"
         ]
       },

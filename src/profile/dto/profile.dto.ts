@@ -3,27 +3,6 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
   @ApiProperty({
-    example: 'John',
-    description: 'User first name'
-  })
-  @IsString()
-  firstName: string;
-
-  @ApiProperty({
-    example: 'Doe',
-    description: 'User last name'
-  })
-  @IsString()
-  lastName: string;
-
-  @ApiProperty({
-    example: 'john@example.com',
-    description: 'User email address'
-  })
-  @IsEmail()
-  email: string;
-
-  @ApiProperty({
     example: '+1 234 567 8900',
     description: 'User phone number'
   })

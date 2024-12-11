@@ -37,9 +37,10 @@ export class ProfileService {
       email: user.email,
       phone: user.phone,
       photoUrl: user.photoUrl,
+      organisation: user.organisation,
       kycLevel: user.kycVerification?.level || 'Level 1',
       transactionLimit: this.formatTransactionLimit(user.kycVerification?.transactionLimit),
-      apiKey: user.apiSettings?.apiKey ? '********' : null,
+      apiKey: user.apiSettings?.apiKey || null,
       twoFactorEnabled: user.twoFactorEnabled,
       apiAccess: user.apiSettings?.apiAccess || false,
       webhookNotifications: user.apiSettings?.webhookNotifications || false,
@@ -51,9 +52,6 @@ export class ProfileService {
       await this.prisma.user.update({
         where: { id: userId },
         data: {
-          firstName: updateProfileDto.firstName,
-          lastName: updateProfileDto.lastName,
-          email: updateProfileDto.email,
           phone: updateProfileDto.phone,
           photoUrl: updateProfileDto.photoUrl,
         },
@@ -115,11 +113,14 @@ export class ProfileService {
 
       // Delete from Cloudinary
       const publicId = this.getPublicIdFromUrl(user.photoUrl);
-      if (publicId) {
-        await this.cloudinaryService.deleteFile(publicId);
+      if (!publicId) {
+        throw new BadRequestException('Invalid photo URL format');
       }
 
-      // Update user profile
+      // Delete from Cloudinary first
+      await this.cloudinaryService.deleteFile(publicId);
+
+      // Only update the database if Cloudinary deletion was successful
       await this.prisma.user.update({
         where: { id: userId },
         data: {
@@ -131,20 +132,24 @@ export class ProfileService {
         message: systemResponses.EN.PHOTO_DELETED
       };
     } catch (error) {
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       throw new BadRequestException(
-        error.message || systemResponses.EN.PHOTO_DELETE_FAILED
+        systemResponses.EN.PHOTO_DELETE_FAILED
       );
     }
   }
 
   private getPublicIdFromUrl(url: string): string | null {
     try {
-      // Extract public ID from Cloudinary URL
-      // Example URL: https://res.cloudinary.com/your-cloud/image/upload/v1234567890/espeepay/profile-photos/abc123.jpg
-      const urlParts = url.split('/');
-      const filename = urlParts[urlParts.length - 1];
-      const folder = urlParts[urlParts.length - 2];
-      return `${folder}/${filename.split('.')[0]}`;
+      // Extract the path after 'upload/'
+      const match = url.match(/\/upload\/(?:v\d+\/)?(.+)$/);
+      if (match && match[1]) {
+        // Remove file extension and return the public ID
+        return match[1].replace(/\.[^/.]+$/, '');
+      }
+      return null;
     } catch {
       return null;
     }

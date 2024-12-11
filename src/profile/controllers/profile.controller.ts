@@ -6,12 +6,10 @@ import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { ProfileService } from '../services/profile.service';
 import { UpdateProfileDto, UpdateSecuritySettingsDto, ApiSettingsDto } from '../dto/profile.dto';
 import { systemResponses } from '../../contracts/system.responses';
-import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
 
 @ApiTags('profile')
 @ApiBearerAuth()
-@ApiSecurity('x-api-key')
-@UseGuards(CombinedAuthGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('profile')
 export class ProfileController {
   constructor(private profileService: ProfileService) {}
@@ -23,9 +21,11 @@ export class ProfileController {
     description: 'Profile details retrieved successfully',
     schema: {
       example: {
-        fullName: 'John Doe',
+        firstName: 'John',
+        lastName: 'Doe',
         email: 'john@example.com',
         phone: '+1 234 567 8900',
+        organisation: 'Acme Corp',
         kycLevel: 'Level 1',
         transactionLimit: '$1,000/day',
         apiKey: '********',

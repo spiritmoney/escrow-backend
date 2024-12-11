@@ -9,12 +9,10 @@ import {
   BankTransferMethodDto, 
   AutoPaymentSettingsDto 
 } from '../dto/payment-method.dto';
-import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
 
 @ApiTags('billing')
 @ApiBearerAuth()
-@ApiSecurity('x-api-key')
-@UseGuards(CombinedAuthGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('billing')
 export class BillingController {
   constructor(

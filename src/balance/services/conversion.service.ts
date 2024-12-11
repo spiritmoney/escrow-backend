@@ -1,22 +1,23 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { FiatCurrency } from '../dto/balance.dto';
+import { Currency } from '../dto/balance.dto';
 import { systemResponses } from '../../contracts/system.responses';
 
 @Injectable()
 export class ConversionService {
   private readonly ESP_RATES = {
-    [FiatCurrency.NGN]: 1800,
-    [FiatCurrency.USD]: 1,
-    [FiatCurrency.EUR]: 1,
+    [Currency.NGN]: 1800,
+    [Currency.USD]: 1,
+    [Currency.EUR]: 1,
   };
 
   constructor(private prisma: PrismaService) {}
 
   async convertCurrency(
+    userId: string,
     fromCurrency: string,
     toCurrency: string,
-    amount: number,
+    amount: number
   ): Promise<{
     convertedAmount: number;
     rate: number;
@@ -31,6 +32,22 @@ export class ConversionService {
 
       if (amount <= 0) {
         throw new BadRequestException(systemResponses.EN.INVALID_AMOUNT);
+      }
+
+      // Check user's balance
+      const userBalance = await this.prisma.balance.findUnique({
+        where: { userId: userId.toString() },
+      });
+
+      if (!userBalance) {
+        throw new UnauthorizedException(systemResponses.EN.INSUFFICIENT_BALANCE);
+      }
+
+      // Get balance for the specific currency
+      const currencyBalance = userBalance[fromCurrency.toLowerCase()];
+      
+      if (typeof currencyBalance !== 'number' || currencyBalance < amount) {
+        throw new UnauthorizedException(systemResponses.EN.INSUFFICIENT_BALANCE);
       }
 
       // Get conversion rate
@@ -50,7 +67,7 @@ export class ConversionService {
         to: toCurrency,
       };
     } catch (error) {
-      if (error instanceof BadRequestException) {
+      if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
         throw error;
       }
       throw new BadRequestException(systemResponses.EN.CONVERSION_FAILED);
@@ -60,7 +77,7 @@ export class ConversionService {
   private isValidCurrency(currency: string): boolean {
     return (
       currency === 'ESP' ||
-      Object.values(FiatCurrency).includes(currency as FiatCurrency)
+      Object.values(Currency).includes(currency as Currency)
     );
   }
 
@@ -69,17 +86,17 @@ export class ConversionService {
 
     // ESP to Fiat
     if (from === 'ESP') {
-      return this.ESP_RATES[to as FiatCurrency] || 0;
+      return this.ESP_RATES[to as Currency] || 0;
     }
 
     // Fiat to ESP
     if (to === 'ESP') {
-      return 1 / (this.ESP_RATES[from as FiatCurrency] || 0);
+      return 1 / (this.ESP_RATES[from as Currency] || 0);
     }
 
     // Fiat to Fiat (through ESP)
-    const fromRate = this.ESP_RATES[from as FiatCurrency];
-    const toRate = this.ESP_RATES[to as FiatCurrency];
+    const fromRate = this.ESP_RATES[from as Currency];
+    const toRate = this.ESP_RATES[to as Currency];
     return toRate / fromRate;
   }
 } 

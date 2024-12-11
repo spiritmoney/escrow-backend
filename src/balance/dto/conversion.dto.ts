@@ -1,6 +1,6 @@
 import { IsString, IsNumber, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { FiatCurrency } from './balance.dto';
+import { Currency } from './balance.dto';
 
 export class ConvertCurrencyDto {
   @ApiProperty({

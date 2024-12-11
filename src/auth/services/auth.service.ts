@@ -84,7 +84,8 @@ export class AuthService implements IAuthService {
         email: user.email, 
         sub: user.id, 
         role: user.role,
-        organisation: user.organisation 
+        organisation: user.organisation,
+        iat: Math.floor(Date.now() / 1000)
       };
       
       const apiSettings = await this.prisma.apiSettings.findUnique({
@@ -95,8 +96,10 @@ export class AuthService implements IAuthService {
         throw new Error(systemResponses.EN.API_KEY_NOT_FOUND);
       }
 
+      const access_token = this.jwtService.sign(payload);
+
       return {
-        access_token: this.jwtService.sign(payload),
+        access_token,
         api_key: apiSettings.apiKey,
         user: {
           id: user.id,
@@ -157,6 +160,17 @@ export class AuthService implements IAuthService {
             apiKey,
             apiAccess: true,
             webhookNotifications: false,
+          },
+        });
+
+        // Create initial balance record
+        await prisma.balance.create({
+          data: {
+            userId: user.id,
+            ngn: 0,
+            usd: 0,
+            eur: 0,
+            esp: 0,
           },
         });
 

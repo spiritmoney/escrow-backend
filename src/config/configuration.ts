@@ -31,6 +31,7 @@ export interface EnvironmentConfig {
   isProduction: boolean;
   isDevelopment: boolean;
   renderUrl?: string;
+  webAppOrigins: string[];
 }
 
 export default () => ({
@@ -39,4 +40,10 @@ export default () => ({
   isProduction: process.env.NODE_ENV === 'production',
   isDevelopment: process.env.NODE_ENV === 'development',
   renderUrl: process.env.RENDER_URL,
+  webAppOrigins: [
+    'http://localhost:3000',
+    'http://localhost:5173',
+    'https://espeespay.vercel.app',
+    /\.vercel\.app$/,
+  ],
 }); 

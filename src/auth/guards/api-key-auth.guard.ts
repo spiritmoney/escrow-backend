@@ -1,4 +1,9 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { systemResponses } from '../../contracts/system.responses';
 
@@ -8,20 +13,23 @@ export class ApiKeyAuthGuard implements CanActivate {
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
+
     const apiKey = request.headers['x-api-key'];
 
     if (!apiKey) {
-      throw new UnauthorizedException(systemResponses.EN.API_KEY_REQUIRED);
+      throw new UnauthorizedException(systemResponses.EN.API_KEY_MISSING);
     }
 
     const apiSettings = await this.prisma.apiSettings.findFirst({
-      where: { 
+      where: {
         apiKey,
-        apiAccess: true 
+
+        apiAccess: true,
       },
+
       include: {
-        user: true
-      }
+        user: true,
+      },
     });
 
     if (!apiSettings) {
@@ -33,7 +41,9 @@ export class ApiKeyAuthGuard implements CanActivate {
     }
 
     // Attach user to request
+
     request.user = apiSettings.user;
+
     return true;
   }
-} 
+}

@@ -74,7 +74,7 @@ export class PaymentLinkTransactionService {
     currency: string
   ) {
     // For crypto transactions, always convert to Espees
-    const espeeAmount = await this.convertToEspees(amount, currency);
+    const espeeAmount = await this.convertToEspees(amount, currency, userId);
 
     // Create escrow for crypto transaction
     const escrowAddress = await this.createCryptoEscrow(
@@ -111,7 +111,7 @@ export class PaymentLinkTransactionService {
   ) {
     // For goods/services, convert if not using Espees
     const espeeAmount = currency !== 'ESP' 
-      ? await this.convertToEspees(amount, currency)
+      ? await this.convertToEspees(amount, currency, userId)
       : amount;
 
     // Create escrow for goods transaction
@@ -142,10 +142,11 @@ export class PaymentLinkTransactionService {
     };
   }
 
-  private async convertToEspees(amount: number, currency: string): Promise<number> {
+  private async convertToEspees(amount: number, currency: string, userId: string): Promise<number> {
     if (currency === 'ESP') return amount;
     
     const conversion = await this.conversionService.convertCurrency(
+      userId,
       currency,
       'ESP',
       amount

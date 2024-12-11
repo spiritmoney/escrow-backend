@@ -1,4 +1,4 @@
-import { AssetType, FiatCurrency } from '../dto/balance.dto';
+import { AssetType, Currency } from '../dto/balance.dto';
 
 export interface FiatBalances {
   NGN: number;

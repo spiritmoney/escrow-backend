@@ -7,6 +7,7 @@ import { IBalanceService, UserBalances } from '../interfaces/balance.interface';
 import { SendMoneyDto, RequestPaymentDto, AssetType } from '../dto/balance.dto';
 import { ethers } from 'ethers';
 import { systemResponses } from '../../contracts/system.responses';
+import { NodemailerService } from '../../services/nodemailer/NodemailerService';
 
 @Injectable()
 export class BalanceService implements IBalanceService {
@@ -15,16 +16,26 @@ export class BalanceService implements IBalanceService {
     private userRepository: UserRepository,
     private walletService: WalletService,
     private configService: ConfigService,
+    private nodeMailerService: NodemailerService,
   ) {}
 
   async getBalances(userId: string): Promise<UserBalances> {
     try {
-      const balances = await this.prisma.balance.findUnique({
+      let balances = await this.prisma.balance.findUnique({
         where: { userId },
       });
 
+      // If no balance record exists, create one with default values
       if (!balances) {
-        throw new NotFoundException(systemResponses.EN.USER_NOT_FOUND);
+        balances = await this.prisma.balance.create({
+          data: {
+            userId,
+            ngn: 0,
+            usd: 0,
+            eur: 0,
+            esp: 0,
+          },
+        });
       }
 
       return {
@@ -41,9 +52,6 @@ export class BalanceService implements IBalanceService {
         },
       };
     } catch (error) {
-      if (error instanceof NotFoundException) {
-        throw error;
-      }
       throw new BadRequestException(systemResponses.EN.BALANCE_FETCH_ERROR);
     }
   }
@@ -217,6 +225,26 @@ export class BalanceService implements IBalanceService {
       },
     });
 
+    // Send email notification to payer
+    try {
+      await this.nodeMailerService.sendEmail({
+        to: [requestDetails.payerEmail],
+        subject: `Payment Request from ${requester.firstName} ${requester.lastName}`,
+        html: `
+          <h2>Payment Request</h2>
+          <p>${requester.firstName} ${requester.lastName} has requested a payment from you.</p>
+          <p><strong>Amount:</strong> ${requestDetails.amount} ${requestDetails.currency}</p>
+          <p><strong>Description:</strong> ${requestDetails.description}</p>
+          <p><strong>Request ID:</strong> ${paymentRequest.id}</p>
+          <p>Click here to pay: <a href="${this.configService.get('RENDER_URL')}/pay/request/${paymentRequest.id}">Process Payment</a></p>
+          <p>Or copy this link: ${this.configService.get('RENDER_URL')}/pay/request/${paymentRequest.id}</p>
+        `,
+      });
+    } catch (error) {
+      console.error('Failed to send payment request email:', error);
+      // Note: We don't throw here as the payment request was still created successfully
+    }
+
     return {
       message: 'Payment request created successfully',
       requestId: paymentRequest.id,
@@ -242,6 +270,48 @@ export class BalanceService implements IBalanceService {
       return txReceipt;
     } catch (error) {
       throw new BadRequestException(systemResponses.EN.CRYPTO_TRANSFER_FAILED);
+    }
+  }
+
+  async getRecentActivity(userId: string) {
+    try {
+      const transactions = await this.prisma.transaction.findMany({
+        where: {
+          OR: [
+            { senderId: userId },
+            { recipientId: userId }
+          ]
+        },
+        orderBy: {
+          createdAt: 'desc'
+        },
+        take: 10,
+        include: {
+          sender: {
+            select: {
+              email: true
+            }
+          },
+          recipient: {
+            select: {
+              email: true
+            }
+          }
+        }
+      });
+
+      return transactions.map(tx => ({
+        type: tx.senderId === userId ? 'SENT' : 'RECEIVED',
+        currency: tx.currency,
+        amount: tx.amount,
+        timestamp: tx.createdAt,
+        note: tx.note,
+        status: tx.status,
+        ...(tx.type === 'CRYPTO' && { txHash: tx.txHash }),
+        counterparty: tx.senderId === userId ? tx.recipient?.email || tx.recipientWallet : tx.sender?.email
+      }));
+    } catch (error) {
+      throw new BadRequestException(systemResponses.EN.INTERNAL_SERVER_ERROR);
     }
   }
 } 

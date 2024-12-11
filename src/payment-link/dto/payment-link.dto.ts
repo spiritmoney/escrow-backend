@@ -1,6 +1,6 @@
 import { IsString, IsNumber, IsEnum, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { FiatCurrency } from '../../balance/dto/balance.dto';
+import { Currency } from '../../balance/dto/balance.dto';
 
 export enum PaymentLinkType {
   BUYING = 'BUYING',
@@ -30,14 +30,14 @@ export class CreatePaymentLinkDto {
   defaultAmount?: number;
 
   @ApiProperty({
-    enum: FiatCurrency,
-    example: FiatCurrency.USD,
+    enum: Currency,
+    example: Currency.USD,
     description: 'Default currency for the payment link',
     required: false
   })
-  @IsEnum(FiatCurrency)
+  @IsEnum(Currency)
   @IsOptional()
-  defaultCurrency?: FiatCurrency;
+  defaultCurrency?: Currency;
 
   @ApiProperty({
     enum: PaymentLinkType,
@@ -66,12 +66,12 @@ export class CreatePaymentLinkDto {
 
 export class UpdatePaymentLinkSettingsDto {
   @ApiProperty({
-    enum: FiatCurrency,
-    example: FiatCurrency.USD,
+    enum: Currency,
+    example: Currency.USD,
     description: 'Default currency for payment links'
   })
-  @IsEnum(FiatCurrency)
-  defaultCurrency: FiatCurrency;
+  @IsEnum(Currency)
+  defaultCurrency: Currency;
 
   @ApiProperty({
     example: 24,

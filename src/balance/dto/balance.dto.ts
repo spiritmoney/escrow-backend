@@ -6,10 +6,16 @@ export enum AssetType {
   CRYPTO = 'CRYPTO'
 }
 
-export enum FiatCurrency {
+export enum Currency {
   NGN = 'NGN',
   USD = 'USD',
-  EUR = 'EUR'
+  EUR = 'EUR',
+  ESP = 'ESP'
+}
+
+export enum TransactionType {
+  SENT = 'SENT',
+  RECEIVED = 'RECEIVED'
 }
 
 export class SendMoneyDto {
@@ -36,14 +42,14 @@ export class SendMoneyDto {
   amount: number;
 
   @ApiProperty({
-    enum: FiatCurrency,
-    example: FiatCurrency.USD,
+    enum: Currency,
+    example: Currency.USD,
     description: 'Currency for FIAT transfers',
     required: false
   })
   @IsOptional()
-  @IsEnum(FiatCurrency)
-  currency?: FiatCurrency;
+  @IsEnum(Currency)
+  currency?: Currency;
 
   @ApiProperty({
     example: 'Payment for services',
@@ -57,12 +63,12 @@ export class SendMoneyDto {
 
 export class RequestPaymentDto {
   @ApiProperty({
-    enum: FiatCurrency,
-    example: FiatCurrency.USD,
-    description: 'Currency for payment request'
+    enum: Currency,
+    example: Currency.USD,
+    description: 'Currency for payment request (FIAT or CRYPTO)'
   })
-  @IsEnum(FiatCurrency)
-  currency: FiatCurrency;
+  @IsEnum(Currency)
+  currency: Currency;
 
   @ApiProperty({
     example: 1000.00,

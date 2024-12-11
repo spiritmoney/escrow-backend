@@ -1,18 +1,17 @@
 import { Controller, Get, Post, Body, UseGuards, Query, BadRequestException, NotFoundException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiSecurity } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { BalanceService } from '../services/balance.service';
 import { ConversionService } from '../services/conversion.service';
-import { SendMoneyDto, RequestPaymentDto } from '../dto/balance.dto';
+import { SendMoneyDto, RequestPaymentDto, TransactionType } from '../dto/balance.dto';
 import { ConvertCurrencyDto, ConversionResponse } from '../dto/conversion.dto';
 import { systemResponses } from '../../contracts/system.responses';
 import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
 
 @ApiTags('balance')
 @ApiBearerAuth()
-@ApiSecurity('x-api-key')
-@UseGuards(CombinedAuthGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('balance')
 export class BalanceController {
   constructor(
@@ -123,12 +122,13 @@ export class BalanceController {
   })
   @ApiResponse({ status: 400, description: systemResponses.EN.INVALID_CONVERSION_PAIR })
   @ApiResponse({ status: 401, description: systemResponses.EN.AUTHENTICATION_FAILED })
-  async convertCurrency(@Body() convertDto: ConvertCurrencyDto) {
+  async convertCurrency(@CurrentUser() user, @Body() convertDto: ConvertCurrencyDto) {
     try {
       return await this.conversionService.convertCurrency(
+        user.id,
         convertDto.from,
         convertDto.to,
-        convertDto.amount,
+        convertDto.amount
       );
     } catch (error) {
       throw new BadRequestException(error.message || systemResponses.EN.CONVERSION_FAILED);
@@ -159,5 +159,34 @@ export class BalanceController {
         EUR: 1,
       },
     };
+  }
+
+  @Get('recent-activity')
+  @ApiOperation({ summary: 'Get recent balance activity' })
+  @ApiResponse({
+    status: 200,
+    description: 'Recent activity retrieved successfully',
+    schema: {
+      example: [{
+        type: 'RECEIVED',
+        currency: 'ESP',
+        amount: 0.05,
+        timestamp: '2024-03-20T10:00:00Z'
+      }, {
+        type: 'SENT',
+        currency: 'USD',
+        amount: 123.45,
+        timestamp: '2024-03-20T07:00:00Z'
+      }]
+    }
+  })
+  @ApiResponse({ status: 401, description: systemResponses.EN.AUTHENTICATION_FAILED })
+  @ApiResponse({ status: 500, description: systemResponses.EN.INTERNAL_SERVER_ERROR })
+  async getRecentActivity(@CurrentUser() user) {
+    try {
+      return await this.balanceService.getRecentActivity(user.id);
+    } catch (error) {
+      throw new BadRequestException(error.message || systemResponses.EN.INTERNAL_SERVER_ERROR);
+    }
   }
 } 

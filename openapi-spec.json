@@ -282,9 +282,6 @@
         },
         "security": [
           {
-            "x-api-key": []
-          },
-          {
             "bearer": []
           }
         ],
@@ -337,9 +334,6 @@
         },
         "security": [
           {
-            "x-api-key": []
-          },
-          {
             "bearer": []
           }
         ],
@@ -389,9 +383,6 @@
           }
         },
         "security": [
-          {
-            "x-api-key": []
-          },
           {
             "bearer": []
           }
@@ -454,9 +445,6 @@
         },
         "security": [
           {
-            "x-api-key": []
-          },
-          {
             "bearer": []
           }
         ],
@@ -493,13 +481,56 @@
         },
         "security": [
           {
-            "x-api-key": []
-          },
-          {
             "bearer": []
           }
         ],
         "summary": "Get current conversion rates",
+        "tags": [
+          "balance"
+        ]
+      }
+    },
+    "/balance/recent-activity": {
+      "get": {
+        "operationId": "BalanceController_getRecentActivity",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "Recent activity retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": [
+                    {
+                      "type": "RECEIVED",
+                      "currency": "ESP",
+                      "amount": 0.05,
+                      "timestamp": "2024-03-20T10:00:00Z"
+                    },
+                    {
+                      "type": "SENT",
+                      "currency": "USD",
+                      "amount": 123.45,
+                      "timestamp": "2024-03-20T07:00:00Z"
+                    }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication failed"
+          },
+          "500": {
+            "description": "An internal server error occurred"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get recent balance activity",
         "tags": [
           "balance"
         ]
@@ -1970,7 +2001,8 @@
             "enum": [
               "NGN",
               "USD",
-              "EUR"
+              "EUR",
+              "ESP"
             ],
             "example": "USD",
             "description": "Currency for FIAT transfers"
@@ -1995,10 +2027,11 @@
             "enum": [
               "NGN",
               "USD",
-              "EUR"
+              "EUR",
+              "ESP"
             ],
             "example": "USD",
-            "description": "Currency for payment request"
+            "description": "Currency for payment request (FIAT or CRYPTO)"
           },
           "amount": {
             "type": "number",
@@ -2097,7 +2130,8 @@
             "enum": [
               "NGN",
               "USD",
-              "EUR"
+              "EUR",
+              "ESP"
             ],
             "example": "USD",
             "description": "Default currency for the payment link"
@@ -2139,7 +2173,8 @@
             "enum": [
               "NGN",
               "USD",
-              "EUR"
+              "EUR",
+              "ESP"
             ],
             "example": "USD",
             "description": "Default currency for payment links"

@@ -24,9 +24,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
+    if (!payload) {
+      throw new UnauthorizedException('Invalid token format');
+    }
+
     const user = await this.userRepository.findByEmail(payload.email);
-    if (!user) {
-      throw new UnauthorizedException();
+    if (!user || user.id !== payload.sub) {
+      throw new UnauthorizedException('Invalid token or user not found');
     }
     return {
       id: payload.sub,

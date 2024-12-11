@@ -6,7 +6,7 @@ import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { systemResponses } from '../../contracts/system.responses';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NodemailerService } from '../../services/nodemailer/NodemailerService';
-import { AssetType, FiatCurrency } from '../../balance/dto/balance.dto';
+import { AssetType, Currency } from '../../balance/dto/balance.dto';
 import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
 
 @ApiTags('payments')
@@ -144,7 +144,7 @@ export class PaymentController {
       }
 
       // Validate and convert currency to FiatCurrency enum
-      if (!Object.values(FiatCurrency).includes(paymentRequest.currency as FiatCurrency)) {
+      if (!Object.values(Currency).includes(paymentRequest.currency as Currency)) {
         throw new BadRequestException(systemResponses.EN.INVALID_CURRENCY);
       }
 
@@ -153,7 +153,7 @@ export class PaymentController {
         assetType: AssetType.FIAT,
         recipientAddress: paymentRequest.requester.email,
         amount: paymentRequest.amount,
-        currency: paymentRequest.currency as FiatCurrency,
+        currency: paymentRequest.currency as Currency,
         note: `Payment for request: ${paymentRequest.description}`,
       });
 

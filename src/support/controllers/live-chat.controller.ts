@@ -15,16 +15,15 @@ import {
   ApiBearerAuth, 
   ApiSecurity 
 } from '@nestjs/swagger';
-import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { LiveChatService } from '../services/live-chat.service';
 import { InitiateChatDto, ChatMessageDto } from '../dto/live-chat.dto';
 import { systemResponses } from '../../contracts/system.responses';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @ApiTags('support')
 @ApiBearerAuth()
-@ApiSecurity('x-api-key')
-@UseGuards(CombinedAuthGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('support/live-chat')
 export class LiveChatController {
   constructor(private liveChatService: LiveChatService) {}

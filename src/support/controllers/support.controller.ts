@@ -1,15 +1,14 @@
 import { Controller, Post, Body, UseGuards, Get } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiSecurity } from '@nestjs/swagger';
-import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { SupportService } from '../services/support.service';
 import { CreateSupportTicketDto } from '../dto/support.dto';
 import { systemResponses } from '../../contracts/system.responses';
+import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
 
 @ApiTags('support')
 @ApiBearerAuth()
-@ApiSecurity('x-api-key')
-@UseGuards(CombinedAuthGuard)
+@UseGuards(JwtAuthGuard)
 @Controller('support')
 export class SupportController {
   constructor(private supportService: SupportService) {}

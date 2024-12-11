@@ -1527,9 +1527,6 @@
         },
         "security": [
           {
-            "x-api-key": []
-          },
-          {
             "bearer": []
           }
         ],
@@ -1565,9 +1562,6 @@
           }
         },
         "security": [
-          {
-            "x-api-key": []
-          },
           {
             "bearer": []
           }
@@ -1610,9 +1604,6 @@
           }
         },
         "security": [
-          {
-            "x-api-key": []
-          },
           {
             "bearer": []
           }
@@ -1660,9 +1651,6 @@
           }
         },
         "security": [
-          {
-            "x-api-key": []
-          },
           {
             "bearer": []
           }
@@ -1715,9 +1703,6 @@
         },
         "security": [
           {
-            "x-api-key": []
-          },
-          {
             "bearer": []
           }
         ],
@@ -1757,9 +1742,6 @@
           }
         },
         "security": [
-          {
-            "x-api-key": []
-          },
           {
             "bearer": []
           }

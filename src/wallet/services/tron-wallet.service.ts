@@ -1,9 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import TronWeb from 'tronweb';
+import { TronWeb, utils as TronWebUtils } from 'tronweb';
 import { IChainWallet, IChainWalletService } from '../interfaces/chain-wallet.interface';
 import { WalletEncryptionService } from './wallet-encryption.service';
 import { WalletType } from '../enums/wallet.enum';
+import { systemResponses } from '../../contracts/system.responses';
 
 @Injectable()
 export class TronWalletService implements IChainWalletService {
@@ -35,7 +36,7 @@ export class TronWalletService implements IChainWalletService {
 
   async generateWallet(): Promise<IChainWallet> {
     try {
-      const account = await this.tronWeb.createAccount();
+      const account = await this.tronWeb.utils.accounts.generateAccount();
       const { encryptedData, iv } = await this.walletEncryptionService.encrypt(
         account.privateKey,
       );
@@ -44,19 +45,24 @@ export class TronWalletService implements IChainWalletService {
         address: account.address.base58,
         encryptedPrivateKey: encryptedData,
         iv: iv,
-        chainId: 1, // Tron mainnet
+        chainId: 1,
         network: 'tron',
         type: WalletType.TRON,
       };
     } catch (error) {
       this.logger.error(`Failed to generate TRON wallet: ${error.message}`);
-      throw new Error('Failed to generate TRON wallet');
+      throw new Error(systemResponses.EN.WALLET_CREATION_ERROR);
     }
   }
 
   async getBalance(address: string): Promise<string> {
-    const balance = await this.tronWeb.trx.getBalance(address);
-    return balance.toString();
+    try {
+      const balance = await this.tronWeb.trx.getBalance(address);
+      return balance.toString();
+    } catch (error) {
+      this.logger.error(`Failed to get balance: ${error.message}`);
+      throw new Error(systemResponses.EN.WALLET_BALANCE_ERROR);
+    }
   }
 
   async getTokenBalance(address: string, tokenAddress: string): Promise<string> {
@@ -67,7 +73,7 @@ export class TronWalletService implements IChainWalletService {
       return this.tronWeb.toBigNumber(balance).shiftedBy(-decimals).toString();
     } catch (error) {
       this.logger.error(`Failed to get token balance: ${error.message}`);
-      throw new Error('Failed to get token balance');
+      throw new Error(systemResponses.EN.TOKEN_BALANCE_ERROR);
     }
   }
 
@@ -75,14 +81,39 @@ export class TronWalletService implements IChainWalletService {
     fromAddress: string,
     toAddress: string,
     amount: string,
-    privateKey: string,
+    encryptedPrivateKey: string,
+    iv: string,
   ): Promise<string> {
-    const transaction = await this.tronWeb.trx.sendTransaction(
-      toAddress,
-      amount,
-      privateKey,
-    );
-    return transaction.txid;
+    try {
+      if (!this.validateAddress(toAddress)) {
+        throw new Error(systemResponses.EN.INVALID_WALLET_ADDRESS);
+      }
+
+      const privateKey = await this.walletEncryptionService.decrypt(
+        encryptedPrivateKey,
+        iv
+      ).catch(() => {
+        throw new Error(systemResponses.EN.INVALID_WALLET_CREDENTIALS);
+      });
+
+      this.tronWeb.setPrivateKey(privateKey);
+
+      const transaction = await this.tronWeb.transactionBuilder.sendTrx(
+        toAddress,
+        Number(amount),
+        fromAddress
+      );
+      const signedTx = await this.tronWeb.trx.sign(transaction);
+      const result = await this.tronWeb.trx.sendRawTransaction(signedTx);
+      
+      if ('transaction' in result && result.transaction?.txID) {
+        return result.transaction.txID;
+      }
+      throw new Error(systemResponses.EN.TRANSACTION_FAILED);
+    } catch (error) {
+      this.logger.error(`Failed to transfer TRX: ${error.message}`);
+      throw new Error(error.message || systemResponses.EN.CRYPTO_TRANSFER_FAILED);
+    }
   }
 
   async transferToken(
@@ -90,16 +121,42 @@ export class TronWalletService implements IChainWalletService {
     toAddress: string,
     tokenAddress: string,
     amount: string,
-    privateKey: string,
+    encryptedPrivateKey: string,
+    iv: string,
   ): Promise<string> {
-    this.tronWeb.setPrivateKey(privateKey);
-    const contract = await this.tronWeb.contract().at(tokenAddress);
-    const transaction = await contract.transfer(toAddress, amount).send();
-    return transaction.txid;
+    try {
+      if (!this.validateAddress(toAddress)) {
+        throw new Error(systemResponses.EN.INVALID_WALLET_ADDRESS);
+      }
+
+      const privateKey = await this.walletEncryptionService.decrypt(
+        encryptedPrivateKey,
+        iv
+      ).catch(() => {
+        throw new Error(systemResponses.EN.INVALID_WALLET_CREDENTIALS);
+      });
+
+      this.tronWeb.setPrivateKey(privateKey);
+      
+      const contract = await this.tronWeb.contract().at(tokenAddress);
+      const result = await contract.transfer(toAddress, amount).send();
+      
+      if ('transaction' in result && result.transaction?.txID) {
+        return result.transaction.txID;
+      }
+      throw new Error(systemResponses.EN.TRANSACTION_FAILED);
+    } catch (error) {
+      this.logger.error(`Failed to transfer token: ${error.message}`);
+      throw new Error(error.message || systemResponses.EN.TOKEN_TRANSFER_FAILED);
+    }
   }
 
   validateAddress(address: string): boolean {
-    return TronWeb.isAddress(address);
+    try {
+      return this.tronWeb.isAddress(address);
+    } catch {
+      return false;
+    }
   }
 
   async estimateEnergy(
@@ -109,21 +166,41 @@ export class TronWalletService implements IChainWalletService {
     tokenAddress?: string
   ): Promise<string> {
     try {
+      if (!this.validateAddress(toAddress)) {
+        throw new Error(systemResponses.EN.INVALID_WALLET_ADDRESS);
+      }
+
       if (tokenAddress) {
         const contract = await this.tronWeb.contract().at(tokenAddress);
-        const estimate = await contract.transfer(toAddress, amount).estimateEnergy();
-        return estimate.toString();
+        const parameter = [{
+          type: 'address',
+          value: toAddress
+        }, {
+          type: 'uint256',
+          value: amount
+        }];
+        
+        const options = {
+          feeLimit: 1000000000,
+          callValue: 0
+        };
+        
+        const transaction = await this.tronWeb.transactionBuilder.triggerSmartContract(
+          tokenAddress,
+          'transfer(address,uint256)',
+          options,
+          parameter,
+          fromAddress
+        );
+        
+        const energyInfo = await this.tronWeb.trx.getTransactionInfo(transaction.transaction.txID);
+        return (energyInfo.receipt.energy_usage || '0').toString();
       }
       
-      const estimate = await this.tronWeb.trx.estimateEnergy(
-        fromAddress,
-        toAddress,
-        amount
-      );
-      return estimate.toString();
+      return '0'; // TRX transfers typically cost 0 energy
     } catch (error) {
       this.logger.error(`Failed to estimate energy: ${error.message}`);
-      throw new Error('Failed to estimate transaction energy');
+      throw new Error(systemResponses.EN.BLOCKCHAIN_ERROR);
     }
   }
 

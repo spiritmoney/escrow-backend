@@ -1,6 +1,10 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { IAuthService, RegisterResponse, UserWallet } from '../interfaces/auth.interface';
+import {
+  IAuthService,
+  RegisterResponse,
+  UserWallet,
+} from '../interfaces/auth.interface';
 import { UserRepository } from '../repositories/user.repository';
 import {
   LoginDto,
@@ -18,7 +22,10 @@ import { MultiChainWalletService } from '../../wallet/services/multi-chain-walle
 import { UserRole } from '../../contracts/roles.contract';
 import { SUPPORTED_CRYPTOCURRENCIES } from '../../wallet/constants/crypto.constants';
 import { SUPPORTED_NETWORKS } from '../../wallet/constants/crypto.constants';
-import { NetworkConfig, TokenDetails } from '../../wallet/interfaces/chain-wallet.interface';
+import {
+  NetworkConfig,
+  TokenDetails,
+} from '../../wallet/interfaces/chain-wallet.interface';
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
 
@@ -80,7 +87,9 @@ export class AuthService implements IAuthService {
     }
 
     if (!user.isVerified) {
-      throw new BadRequestException(systemResponses.EN.EMAIL_VERIFICATION_REQUIRED);
+      throw new BadRequestException(
+        systemResponses.EN.EMAIL_VERIFICATION_REQUIRED,
+      );
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
@@ -105,11 +114,11 @@ export class AuthService implements IAuthService {
         email: user.email,
         sub: user.id,
         role: user.role,
-        organisation: user.organisation
+        organisation: user.organisation,
       };
 
       return {
-        access_token: this.jwtService.sign(payload)
+        access_token: this.jwtService.sign(payload),
       };
     } catch {
       throw new BadRequestException(systemResponses.EN.INVALID_REFRESH_TOKEN);
@@ -119,16 +128,21 @@ export class AuthService implements IAuthService {
   async changePassword(
     userId: string,
     currentPassword: string,
-    newPassword: string
+    newPassword: string,
   ): Promise<{ message: string }> {
     const user = await this.userRepository.findById(userId);
     if (!user) {
       throw new BadRequestException(systemResponses.EN.USER_NOT_FOUND);
     }
 
-    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    const isPasswordValid = await bcrypt.compare(
+      currentPassword,
+      user.password,
+    );
     if (!isPasswordValid) {
-      throw new BadRequestException(systemResponses.EN.INVALID_CURRENT_PASSWORD);
+      throw new BadRequestException(
+        systemResponses.EN.INVALID_CURRENT_PASSWORD,
+      );
     }
 
     const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -144,7 +158,9 @@ export class AuthService implements IAuthService {
     }
 
     if (user.twoFactorEnabled) {
-      throw new BadRequestException(systemResponses.EN.TWO_FACTOR_ALREADY_ENABLED);
+      throw new BadRequestException(
+        systemResponses.EN.TWO_FACTOR_ALREADY_ENABLED,
+      );
     }
 
     const secret = speakeasy.generateSecret();
@@ -154,7 +170,7 @@ export class AuthService implements IAuthService {
 
     return {
       secret: secret.base32,
-      qrCode
+      qrCode,
     };
   }
 
@@ -167,7 +183,7 @@ export class AuthService implements IAuthService {
     const isValid = speakeasy.totp.verify({
       secret: user.twoFactorSecret,
       encoding: 'base32',
-      token
+      token,
     });
 
     if (!isValid) {
@@ -181,7 +197,10 @@ export class AuthService implements IAuthService {
     return true;
   }
 
-  async disable2FA(userId: string, token: string): Promise<{ message: string }> {
+  async disable2FA(
+    userId: string,
+    token: string,
+  ): Promise<{ message: string }> {
     const isValid = await this.verify2FA(userId, token);
     if (!isValid) {
       throw new BadRequestException(systemResponses.EN.INVALID_2FA_TOKEN);
@@ -236,7 +255,9 @@ export class AuthService implements IAuthService {
   async register(registerDto: RegisterDto): Promise<RegisterResponse> {
     try {
       // Check for existing user
-      const existingUser = await this.userRepository.findByEmail(registerDto.email);
+      const existingUser = await this.userRepository.findByEmail(
+        registerDto.email,
+      );
       if (existingUser) {
         throw new BadRequestException(systemResponses.EN.USER_EMAIL_EXISTS);
       }
@@ -301,8 +322,8 @@ export class AuthService implements IAuthService {
           iv: true,
           network: true,
           type: true,
-          chainId: true
-        }
+          chainId: true,
+        },
       });
 
       // Map user data excluding sensitive information
@@ -341,7 +362,8 @@ export class AuthService implements IAuthService {
   }
 
   private async createCustodialWallets(userId: string, prisma: any) {
-    const supportedTokens: Record<string, TokenDetails> = SUPPORTED_CRYPTOCURRENCIES;
+    const supportedTokens: Record<string, TokenDetails> =
+      SUPPORTED_CRYPTOCURRENCIES;
     const supportedNetworks: Record<string, NetworkConfig> = SUPPORTED_NETWORKS;
 
     for (const [networkKey, network] of Object.entries(supportedNetworks)) {
@@ -359,8 +381,8 @@ export class AuthService implements IAuthService {
             balance: '0',
             status: 'ACTIVE',
             network: network.name || networkKey,
-            tokenDecimals: tokenDetails.decimals || 18 // Default to 18 if not specified
-          }
+            tokenDecimals: tokenDetails.decimals || 18, // Default to 18 if not specified
+          },
         });
       }
     }

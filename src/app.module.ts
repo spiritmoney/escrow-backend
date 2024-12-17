@@ -3,9 +3,11 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { JwtModule } from '@nestjs/jwt';
 import { PassportModule } from '@nestjs/passport';
 import { v2 as cloudinary } from 'cloudinary';
-import configuration, { SystemConfigDTO } from './config/configuration';
+import configuration from './config/configuration';
 import { validate } from './config/env.validation';
 import { systemResponses } from './contracts/system.responses';
+import { BridgeService } from './services/bridge/bridge.service';
+import { BridgeProvider } from './services/bridge/providers/bridge.provider';
 
 // Controllers
 import { AuthController } from './auth/controllers/auth.controller';
@@ -24,7 +26,6 @@ import { LiveChatController } from './support/controllers/live-chat.controller';
 import { PrismaService } from './prisma/prisma.service';
 import { AuthService } from './auth/services/auth.service';
 import { UserRepository } from './auth/repositories/user.repository';
-import { WalletService } from './wallet/wallet.service';
 import { NodemailerService } from './services/nodemailer/NodemailerService';
 import { KeepaliveService } from './services/keepalive/KeepaliveService';
 import { JwtStrategy } from './auth/strategies/jwt.strategy';
@@ -50,6 +51,16 @@ import { CombinedAuthGuard } from './auth/guards/combined-auth.guard';
 import { SupportService } from './support/services/support.service';
 import { LiveChatService } from './support/services/live-chat.service';
 
+// Wallet Services
+import { BitcoinWalletService } from './wallet/services/bitcoin-wallet.service';
+import { EthereumWalletService } from './wallet/services/ethereum-wallet.service';
+import { TronWalletService } from './wallet/services/tron-wallet.service';
+import { SolanaWalletService } from './wallet/services/solana-wallet.service';
+import { BnbWalletService } from './wallet/services/bnb-wallet.service';
+import { PolygonWalletService } from './wallet/services/polygon-wallet.service';
+import { MultiChainWalletService } from './wallet/services/multi-chain-wallet.service';
+import { WalletEncryptionService } from './wallet/services/wallet-encryption.service';
+
 // Cloudinary Provider
 const CloudinaryProvider = {
   provide: 'CLOUDINARY',
@@ -64,14 +75,11 @@ const CloudinaryProvider = {
     }
 
     try {
-      const config = {
+      return cloudinary.config({
         cloud_name: cloudName,
         api_key: apiKey,
         api_secret: apiSecret,
-      };
-      
-      cloudinary.config(config);
-      return cloudinary;
+      });
     } catch (error) {
       throw new Error(systemResponses.EN.CLOUDINARY_CONNECTION_ERROR);
     }
@@ -115,7 +123,6 @@ const CloudinaryProvider = {
     PrismaService,
     AuthService,
     UserRepository,
-    WalletService,
     NodemailerService,
     KeepaliveService,
     HashingService,
@@ -137,9 +144,13 @@ const CloudinaryProvider = {
     TradeProtectionService,
     EscrowMonitorService,
     DisputeResolutionService,
+    
+    // Subscription Services
     SubscriptionService,
     PaymentMethodService,
     BillingHistoryService,
+    
+    // Profile Services
     ProfileService,
     
     // Cloud Services
@@ -149,8 +160,29 @@ const CloudinaryProvider = {
     // Guards
     ApiKeyAuthGuard,
     CombinedAuthGuard,
+    
+    // Support Services
     SupportService,
     LiveChatService,
+    
+    // Wallet Services
+    BitcoinWalletService,
+    EthereumWalletService,
+    TronWalletService,
+    SolanaWalletService,
+    BnbWalletService,
+    PolygonWalletService,
+    MultiChainWalletService,
+    WalletEncryptionService,
+    
+    // Bridge Services
+    BridgeService,
+    BridgeProvider,
+  ],
+  exports: [
+    MultiChainWalletService,
+    PrismaService,
+    BridgeService,
   ],
 })
 export class AppModule implements OnModuleInit {

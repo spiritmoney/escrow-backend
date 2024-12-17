@@ -2,101 +2,163 @@ import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/
 import { PrismaService } from '../../prisma/prisma.service';
 import { Currency } from '../dto/balance.dto';
 import { systemResponses } from '../../contracts/system.responses';
+import { ConfigService } from '@nestjs/config';
+import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class ConversionService {
-  private readonly ESP_RATES = {
-    [Currency.NGN]: 1800,
-    [Currency.USD]: 1,
-    [Currency.EUR]: 1,
+  private readonly logger = new Logger(ConversionService.name);
+
+  // Define base rates for each currency pair
+  private readonly CURRENCY_RATES = {
+    // Base USD rates
+    USD_NGN: 1650,    // 1 USD = 1650 NGN
+    EUR_NGN: 1750,    // 1 EUR = 1750 NGN
+    
+    // Crypto rates (example - should be fetched from oracle)
+    ETH_USD: 3000,    // 1 ETH = 3000 USD
+    BTC_USD: 50000,   // 1 BTC = 50000 USD
+    USDT_USD: 1,      // 1 USDT = 1 USD
+    USDC_USD: 1,      // 1 USDC = 1 USD
+    BNB_USD: 300,     // 1 BNB = 300 USD
   };
 
-  constructor(private prisma: PrismaService) {}
+  private readonly SUPPORTED_CURRENCIES = [
+    'USD',
+    'NGN',
+    'EUR',
+    'BTC',
+    'ETH',
+    'USDT',
+    'USDC',
+    'BNB'
+  ];
+
+  constructor(
+    private prisma: PrismaService,
+    private configService: ConfigService
+  ) {}
+
+  private isValidCurrency(currency: string): boolean {
+    return this.SUPPORTED_CURRENCIES.includes(currency);
+  }
+
+  public getConversionRate(
+    fromCurrency: string,
+    toCurrency: string
+  ): number {
+    if (fromCurrency === toCurrency) return 1;
+
+    // Direct conversion rates
+    const directRate = this.getDirectRate(fromCurrency, toCurrency);
+    if (directRate !== null) {
+      return directRate;
+    }
+
+    // Convert through USD as base currency
+    const fromUsdRate = this.getUsdRate(fromCurrency);
+    const toUsdRate = this.getUsdRate(toCurrency);
+    
+    if (fromUsdRate === null || toUsdRate === null) {
+      throw new BadRequestException(systemResponses.EN.CONVERSION_FAILED);
+    }
+    
+    return (1 / fromUsdRate) * toUsdRate;
+  }
+
+  private getDirectRate(from: string, to: string): number | null {
+    const rateKey = `${from}_${to}`;
+    if (this.CURRENCY_RATES[rateKey]) {
+      return this.CURRENCY_RATES[rateKey];
+    }
+
+    // Check reverse rate
+    const reverseRateKey = `${to}_${from}`;
+    if (this.CURRENCY_RATES[reverseRateKey]) {
+      return 1 / this.CURRENCY_RATES[reverseRateKey];
+    }
+
+    return null;
+  }
+
+  private getUsdRate(currency: string): number | null {
+    if (currency === 'USD') return 1;
+
+    // Check direct USD rate
+    const directRate = this.CURRENCY_RATES[`${currency}_USD`];
+    if (directRate) return directRate;
+
+    // Check reverse USD rate
+    const reverseRate = this.CURRENCY_RATES[`USD_${currency}`];
+    if (reverseRate) return 1 / reverseRate;
+
+    return null;
+  }
+
+  async convertAmount(
+    amount: number,
+    fromCurrency: string,
+    toCurrency: string
+  ): Promise<number> {
+    if (!this.isValidCurrency(fromCurrency) || !this.isValidCurrency(toCurrency)) {
+      throw new BadRequestException(systemResponses.EN.INVALID_CURRENCY);
+    }
+
+    const rate = this.getConversionRate(fromCurrency, toCurrency);
+    return amount * rate;
+  }
+
+  async getLatestRates(baseCurrency: string): Promise<Record<string, number>> {
+    if (!this.isValidCurrency(baseCurrency)) {
+      throw new BadRequestException(systemResponses.EN.INVALID_CURRENCY);
+    }
+
+    const rates: Record<string, number> = {};
+    for (const currency of this.SUPPORTED_CURRENCIES) {
+      if (currency !== baseCurrency) {
+        rates[currency] = this.getConversionRate(baseCurrency, currency);
+      }
+    }
+
+    return rates;
+  }
+
+  // Helper method to get crypto price in USD
+  async getCryptoUsdPrice(tokenSymbol: string): Promise<number> {
+    const rateKey = `${tokenSymbol}_USD`;
+    const rate = this.CURRENCY_RATES[rateKey];
+    
+    if (!rate) {
+      throw new BadRequestException(systemResponses.EN.UNSUPPORTED_CRYPTOCURRENCY);
+    }
+    
+    return rate;
+  }
 
   async convertCurrency(
-    userId: string,
+    amount: number,
     fromCurrency: string,
-    toCurrency: string,
-    amount: number
-  ): Promise<{
-    convertedAmount: number;
-    rate: number;
-    from: string;
-    to: string;
-  }> {
+    toCurrency: string
+  ): Promise<number> {
     try {
-      // Validate currencies
       if (!this.isValidCurrency(fromCurrency) || !this.isValidCurrency(toCurrency)) {
         throw new BadRequestException(systemResponses.EN.INVALID_CURRENCY);
       }
 
-      if (amount <= 0) {
-        throw new BadRequestException(systemResponses.EN.INVALID_AMOUNT);
-      }
-
-      // Check user's balance
-      const userBalance = await this.prisma.balance.findUnique({
-        where: { userId: userId.toString() },
-      });
-
-      if (!userBalance) {
-        throw new UnauthorizedException(systemResponses.EN.INSUFFICIENT_BALANCE);
-      }
-
-      // Get balance for the specific currency
-      const currencyBalance = userBalance[fromCurrency.toLowerCase()];
-      
-      if (typeof currencyBalance !== 'number' || currencyBalance < amount) {
-        throw new UnauthorizedException(systemResponses.EN.INSUFFICIENT_BALANCE);
+      // If currencies are the same, return the original amount
+      if (fromCurrency === toCurrency) {
+        return amount;
       }
 
       // Get conversion rate
-      const rate = this.getConversionRate(fromCurrency, toCurrency);
+      const rate = await this.getConversionRate(fromCurrency, toCurrency);
       
-      if (rate === 0) {
-        throw new BadRequestException(systemResponses.EN.INVALID_CONVERSION_PAIR);
-      }
-
-      // Calculate converted amount
-      const convertedAmount = amount * rate;
-
-      return {
-        convertedAmount,
-        rate,
-        from: fromCurrency,
-        to: toCurrency,
-      };
+      // Convert amount
+      return amount * rate;
     } catch (error) {
-      if (error instanceof BadRequestException || error instanceof UnauthorizedException) {
-        throw error;
-      }
+      this.logger.error(`Error converting currency: ${error.message}`);
       throw new BadRequestException(systemResponses.EN.CONVERSION_FAILED);
     }
   }
-
-  private isValidCurrency(currency: string): boolean {
-    return (
-      currency === 'ESP' ||
-      Object.values(Currency).includes(currency as Currency)
-    );
-  }
-
-  private getConversionRate(from: string, to: string): number {
-    if (from === to) return 1;
-
-    // ESP to Fiat
-    if (from === 'ESP') {
-      return this.ESP_RATES[to as Currency] || 0;
-    }
-
-    // Fiat to ESP
-    if (to === 'ESP') {
-      return 1 / (this.ESP_RATES[from as Currency] || 0);
-    }
-
-    // Fiat to Fiat (through ESP)
-    const fromRate = this.ESP_RATES[from as Currency];
-    const toRate = this.ESP_RATES[to as Currency];
-    return toRate / fromRate;
-  }
 } 
+

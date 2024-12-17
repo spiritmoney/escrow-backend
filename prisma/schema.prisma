@@ -38,10 +38,13 @@ model User {
   phone                String?
   photoUrl             String?
   twoFactorEnabled     Boolean              @default(false)
+  twoFactorSecret      String?
   apiSettings          ApiSettings?
   kycVerification      KycVerification?
   supportTickets       SupportTicket[]
   chatSessions         ChatSession[]
+  cryptoReservations   CryptoBalanceReservation[]
+  custodialWallets    CustodialWallet[]
 
   @@map("users")
 }
@@ -65,29 +68,37 @@ model Balance {
 }
 
 model Transaction {
-  id               String    @id @default(cuid())
-  senderId         String
-  recipientId      String?
-  recipientWallet  String?
-  amount           Float
-  currency         String
-  type             String // 'FIAT', 'CRYPTO', 'ESCROW', or 'GOODS'
-  status           String
-  note             String?
-  txHash           String? // Blockchain transaction hash
-  escrowAddress    String?
-  originalAmount   Float?
-  originalCurrency String?
-  paymentMethod    String?
-  paymentDetails   Json?
-  paymentConfirmed Boolean   @default(false)
-  buyerConfirmed   Boolean   @default(false)
-  sellerConfirmed  Boolean   @default(false)
-  createdAt        DateTime  @default(now())
-  expiresAt        DateTime?
-  sender           User      @relation("SentTransactions", fields: [senderId], references: [id])
-  recipient        User?     @relation("ReceivedTransactions", fields: [recipientId], references: [id])
-  disputes         Dispute[]
+  id                String      @id @default(cuid())
+  senderId          String
+  recipientId       String?
+  recipientWallet   String?
+  customerId        String
+  customer          Customer    @relation(fields: [customerId], references: [id])
+  amount            Float
+  currency          String
+  type              String
+  status            String      @default("PENDING")
+  note              String?
+  txHash            String?
+  chainId           Int?
+  tokenAddress      String?
+  escrowAddress     String?
+  originalAmount    Float?
+  originalCurrency  String?
+  paymentMethod     String?
+  paymentDetails    Json?
+  paymentConfirmed  Boolean     @default(false)
+  buyerConfirmed    Boolean     @default(false)
+  sellerConfirmed   Boolean     @default(false)
+  createdAt         DateTime    @default(now())
+  expiresAt         DateTime?
+  data              Json?
+  method            String?
+  verificationState String?     @default("INITIATED")
+  milestones        Milestone[]
+  sender            User        @relation("SentTransactions", fields: [senderId], references: [id])
+  recipient         User?       @relation("ReceivedTransactions", fields: [recipientId], references: [id])
+  disputes          Dispute[]
 
   @@map("transactions")
 }
@@ -113,32 +124,47 @@ model Wallet {
   address             String   @unique
   encryptedPrivateKey String
   iv                  String
-  user                User     @relation(fields: [userId], references: [id])
+  network             String
+  type                String
+  chainId             Int
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
+  user                User     @relation(fields: [userId], references: [id])
 
-  @@map("wallets")
+  @@unique([userId, network])
 }
 
 model PaymentLink {
-  id              String   @id @default(cuid())
-  name            String
-  url             String   @unique
-  status          String   @default("ACTIVE")
-  defaultAmount   Float?
-  defaultCurrency String?
-  escrowAddress   String?
-  sellerAddress   String?
-  buyerAddress    String?
-  type            String // 'BUYING' or 'SELLING'
-  transactionType String // 'CRYPTOCURRENCY' or 'GOODS_SERVICES'
-  description     String? // Description for goods/services
-  createdBy       User     @relation(fields: [userId], references: [id])
-  userId          String
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                String              @id @default(cuid())
+  name              String
+  url               String
+  type              String              // BUYING or SELLING
+  transactionType   String              // CRYPTOCURRENCY, PHYSICAL_GOODS, etc.
+  status            String              @default("ACTIVE")
+  defaultAmount     Float?
+  defaultCurrency   String?
+  details           Json?               // Stores the cryptocurrency or other details
+  verificationMethod String?
+  userId            String
+  createdBy         User               @relation(fields: [userId], references: [id])
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  expiresAt         DateTime?
+  paymentLinkMethods PaymentLinkMethod[]
 
   @@map("payment_links")
+}
+
+model PaymentLinkMethod {
+  id            String      @id @default(uuid())
+  paymentLinkId String
+  methodId      String
+  type          String
+  isDefault     Boolean     @default(false)
+  details       Json
+  paymentLink   PaymentLink @relation(fields: [paymentLinkId], references: [id], onDelete: Cascade)
+
+  @@index([paymentLinkId])
 }
 
 model PaymentLinkSettings {
@@ -301,4 +327,115 @@ model ChatMessage {
 
   @@index([sessionId])
   @@map("chat_messages")
+}
+
+model Milestone {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id])
+  description   String
+  amount        Float
+  order         Int
+  status        String
+  completedAt   DateTime?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  @@map("milestones")
+}
+
+enum VerificationStatus {
+  INITIATED
+  PENDING_DELIVERY
+  PROOF_SUBMITTED
+  PENDING_DOWNLOAD
+  AWAITING_CONFIRMATIONS
+  COMPLETED
+  FAILED
+}
+
+enum VerificationMethod {
+  LOGISTICS_API
+  PROOF_BASED
+  SMS_EMAIL
+  MILESTONE_BASED
+  TWO_WAY_CONFIRMATION
+  SECURE_DELIVERY
+  BLOCKCHAIN_ESCROW
+  MANUAL_HASH
+}
+
+model Customer {
+  id            String        @id @default(uuid())
+  email         String        @unique
+  name          String?
+  transactions  Transaction[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+}
+
+model CryptoBalanceReservation {
+  id           String   @id @default(cuid())
+  userId       String
+  tokenAddress String
+  chainId      Int
+  amount       Float
+  status       String   // RESERVED, RELEASED, USED
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, tokenAddress, chainId])
+  @@index([status])
+}
+
+model CustodialWallet {
+  id            String   @id @default(cuid())
+  userId        String
+  token         String
+  chainId       Int
+  network       String
+  type          String   @default("CUSTODIAL")
+  status        String   @default("ACTIVE")
+  balance       String   @default("0")
+  address       String?
+  tokenDecimals Int      @default(18)
+  lastUpdated   DateTime @default(now())
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id])
+  balanceHistory CustodialBalanceHistory[]
+
+  @@unique([userId, token, chainId])
+  @@map("custodial_wallets")
+}
+
+model CustodialBalanceHistory {
+  id        String   @id @default(cuid())
+  walletId  String
+  amount    String
+  type      String
+  timestamp DateTime @default(now())
+
+  wallet    CustodialWallet @relation(fields: [walletId], references: [id])
+
+  @@map("custodial_balance_history")
+}
+
+model BridgeTransaction {
+  id              String   @id @default(cuid())
+  sourceToken     String
+  sourceChainId   Int
+  targetToken     String
+  targetChainId   Int
+  amount          String
+  userAddress     String
+  status          String
+  txHash          String?
+  targetTxHash    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("bridge_transactions")
 }

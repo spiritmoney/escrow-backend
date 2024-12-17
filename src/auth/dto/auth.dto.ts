@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, IsEnum } from 'class-validator';
+import { IsEmail, IsString, MinLength, IsEnum, IsOptional, Length } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 import { UserRole } from '../../contracts/roles.contract';
 
@@ -49,12 +49,20 @@ export class RegisterDto extends LoginDto {
   organisation: string;
 
   @ApiProperty({
-    enum: ['BUSINESS', 'DEVELOPER'],
-    example: 'DEVELOPER',
+    enum: UserRole,
+    example: UserRole.DEVELOPER,
     description: 'User role (BUSINESS or DEVELOPER)'
   })
-  @IsEnum(['BUSINESS', 'DEVELOPER'] as const)
+  @IsEnum(UserRole)
   role: UserRole;
+
+  @ApiProperty({
+    required: false,
+    description: 'Optional referral code'
+  })
+  @IsOptional()
+  @IsString()
+  referralCode?: string;
 }
 
 export class VerifyOtpDto {
@@ -91,4 +99,23 @@ export class ResetPasswordDto extends VerifyOtpDto {
   @IsString()
   @MinLength(8)
   newPassword: string;
+}
+
+export class ChangePasswordDto {
+  @ApiProperty()
+  @IsString()
+  @MinLength(8)
+  currentPassword: string;
+
+  @ApiProperty()
+  @IsString()
+  @MinLength(8)
+  newPassword: string;
+}
+
+export class TwoFactorDto {
+  @ApiProperty()
+  @IsString()
+  @Length(6, 6)
+  token: string;
 } 

@@ -1,6 +1,6 @@
-export const USER_ROLE_LIST = [
-  'BUSINESS',
-  'DEVELOPER',
-] as const;
+export enum UserRole {
+  BUSINESS = 'BUSINESS',
+  DEVELOPER = 'DEVELOPER'
+}
 
-export type UserRole = typeof USER_ROLE_LIST[number]; 
+export const USER_ROLE_LIST = Object.values(UserRole); 

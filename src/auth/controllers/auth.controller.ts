@@ -7,7 +7,7 @@ import {
   ApiBody 
 } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
-import { LoginDto, RegisterDto, VerifyOtpDto, RequestPasswordResetDto, ResetPasswordDto } from '../dto/auth.dto';
+import { LoginDto, RegisterDto, VerifyOtpDto, RequestPasswordResetDto, ResetPasswordDto, ChangePasswordDto } from '../dto/auth.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
@@ -124,5 +124,52 @@ export class AuthController {
   @Get('profile')
   getProfile(@CurrentUser() user) {
     return user;
+  }
+
+  @Post('refresh')
+  @ApiOperation({ summary: 'Refresh access token' })
+  async refreshToken(@Body('refresh_token') refreshToken: string) {
+    return this.authService.refreshToken(refreshToken);
+  }
+
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Change password' })
+  async changePassword(
+    @CurrentUser() user,
+    @Body() changePasswordDto: ChangePasswordDto
+  ) {
+    return this.authService.changePassword(
+      user.id,
+      changePasswordDto.currentPassword,
+      changePasswordDto.newPassword
+    );
+  }
+
+  @Post('2fa/enable')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Enable 2FA' })
+  async enable2FA(@CurrentUser() user) {
+    return this.authService.enable2FA(user.id);
+  }
+
+  @Post('2fa/verify')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Verify 2FA token' })
+  async verify2FA(
+    @CurrentUser() user,
+    @Body('token') token: string
+  ) {
+    return this.authService.verify2FA(user.id, token);
+  }
+
+  @Post('2fa/disable')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'Disable 2FA' })
+  async disable2FA(
+    @CurrentUser() user,
+    @Body('token') token: string
+  ) {
+    return this.authService.disable2FA(user.id, token);
   }
 } 

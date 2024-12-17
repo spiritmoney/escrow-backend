@@ -172,7 +172,7 @@ export const systemResponses = {
 
     TRANSACTION_COMPLETED: 'Transaction completed successfully',
 
-    TRANSACTION_STATUS_UPDATED: 'Transaction status updated',
+    TRANSACTION_STATUS_UPDATED: 'Transaction status updated successfully',
 
     TRANSACTION_VALIDATION_FAILED: 'Transaction validation failed',
 
@@ -187,6 +187,34 @@ export const systemResponses = {
     INVALID_TRANSACTION_TYPE: 'Invalid transaction type',
 
     INVALID_TRANSACTION_STATUS: 'Invalid transaction status',
+
+    TRANSACTION_VERIFIED: 'Transaction verified successfully',
+
+    VERIFICATION_FAILED: 'Transaction verification failed',
+
+    TRANSACTION_SUCCESSFUL: 'Transaction completed successfully',
+
+    DETAILS_RETRIEVAL_FAILED: 'Failed to retrieve transaction details',
+
+    TRANSACTION_SUCCESS: 'Transaction completed successfully',
+
+    TRANSACTION_UNAUTHORIZED: 'Unauthorized to perform this transaction operation',
+
+    TRANSACTION_NOT_FOUND: 'Transaction not found',
+
+    TRANSACTION_ACCESS_DENIED: 'Access to this transaction is denied',
+
+    TRANSACTION_ALREADY_PROCESSED: 'Transaction has already been processed',
+
+    TRANSACTION_CONFIRMATION_REQUIRED: 'Transaction confirmation is required',
+
+    TRANSACTION_CANCELLED: 'Transaction has been cancelled',
+
+    TRANSACTION_PROCESSING: 'Transaction is being processed',
+
+    TRANSACTION_REJECTED: 'Transaction has been rejected',
+
+    TRANSACTION_PENDING_APPROVAL: 'Transaction is pending approval',
 
     // Wallet Related
 
@@ -219,6 +247,21 @@ export const systemResponses = {
     PAYMENT_LINK_INVALID_TYPE: 'Invalid payment link type',
 
     PAYMENT_LINK_UNAUTHORIZED: 'Unauthorized to access this payment link',
+
+    INVALID_VERIFICATION_METHOD: 'Invalid verification method provided',
+
+    INVALID_VERIFICATION_DATA: 'Invalid verification data provided',
+
+    TRANSACTION_HASH_REQUIRED: 'Transaction hash is required for verification',
+
+    PAYMENT_ID_REQUIRED: 'Payment ID is required for verification',
+
+    TRANSFER_REFERENCE_REQUIRED:
+      'Transfer reference is required for verification',
+
+    UNSUPPORTED_PAYMENT_METHOD: 'Unsupported payment method for verification',
+
+    TRANSACTION_MISMATCH: 'Transaction does not belong to this payment link',
 
     // Escrow Related
 
@@ -370,5 +413,84 @@ export const systemResponses = {
     TICKET_CREATION_FAILED: 'Failed to create support ticket',
 
     TICKET_FETCH_FAILED: 'Failed to fetch support tickets',
+
+    PAYMENT_METHOD_REQUIRED: 'At least one payment method is required',
+    INVALID_PAYMENT_METHOD: 'Invalid payment method specified',
+    PAYMENT_METHOD_NOT_AVAILABLE: 'Selected payment method is not available',
+
+    // Cryptocurrency Related
+    UNSUPPORTED_CRYPTOCURRENCY: 'Unsupported cryptocurrency',
+    UNSUPPORTED_NETWORK: 'Unsupported blockchain network',
+    UNSUPPORTED_TOKEN_NETWORK: 'Token not supported on this network',
+
+    // Bridge Related
+    BRIDGE_FAILED: 'Failed to bridge tokens',
+    BRIDGE_SUCCESS: 'Successfully bridged tokens',
+    BRIDGE_NOT_SUPPORTED: 'Bridge not supported for this chain',
+    BRIDGE_INVALID_AMOUNT: 'Invalid amount for bridging',
+    BRIDGE_INVALID_TOKEN: 'Invalid or unsupported token for bridging',
+    BRIDGE_INVALID_CHAIN: 'Invalid or unsupported blockchain network',
+    BRIDGE_PROVIDER_ERROR: 'Error connecting to blockchain provider',
+    BRIDGE_CONTRACT_ERROR: 'Error interacting with bridge contract',
+    BRIDGE_TRANSACTION_FAILED: 'Bridge transaction failed',
+    BRIDGE_RATE_NOT_SET: 'Conversion rate not set for token',
+    BRIDGE_TOKEN_NOT_WHITELISTED: 'Token not whitelisted for bridging',
+    BRIDGE_INSUFFICIENT_BALANCE: 'Insufficient token balance for bridging',
+    BRIDGE_PAUSED: 'Bridge operations are currently paused',
+
+    // Generic responses
+    TOKEN_APPROVAL_FAILED: 'Failed to approve tokens',
+    TOKEN_TRANSFER_FAILED: 'Failed to transfer tokens',
+    TOKEN_BALANCE_ERROR: 'Error getting token balance',
+    UNSUPPORTED_TOKEN: 'Unsupported token',
+    BRIDGE_UNAVAILABLE: 'Bridge service currently unavailable',
+
+    // Currency Related
+    UNSUPPORTED_CURRENCY: 'Unsupported currency',
+    CURRENCY_NOT_AVAILABLE: 'Currency not available',
+
+    // Payment Link Related
+    PAYMENT_LINK_CREATION_FAILED: 'Failed to create payment link',
+    PAYMENT_LINK_INVALID: 'Invalid payment link',
+
+    // Bridge Related
+    BRIDGE_CONVERSION_FAILED: 'Failed to convert tokens through bridge',
+
+    // Transaction Related
+
+    // Escrow Related
+    ESCROW_INVALID: 'Invalid escrow contract',
+    ESCROW_EXPIRED: 'Escrow contract has expired',
+
+    // Token Related
+
+    // Network Related
+    NETWORK_ERROR: 'Network connection error',
+    INVALID_NETWORK: 'Invalid network specified',
+    NETWORK_NOT_AVAILABLE: 'Network currently not available',
+
+    // Wallet Related
+    WALLET_CONNECTION_FAILED: 'Failed to connect wallet',
+    WALLET_BALANCE_ERROR: 'Error getting wallet balance',
+
+    // Service Related
+    SERVICE_PROOF_REQUIRED: 'Service proof is required',
+    SERVICE_PROOF_INVALID: 'Invalid service proof',
+    SERVICE_VERIFICATION_FAILED: 'Service verification failed',
+    SERVICE_COMPLETION_REQUIRED: 'Service completion proof required',
+
+    TRANSACTION_UPDATE_FAILED: 'Failed to update transaction status',
+
+    CUSTODIAL_WALLET_NOT_FOUND: 'Custodial wallet not found',
+    BRIDGE_INSUFFICIENT_LIQUIDITY: 'Insufficient liquidity for bridge operation',
+    BRIDGE_SLIPPAGE_TOO_HIGH: 'Bridge slippage too high',
+
+    INVALID_REFRESH_TOKEN: 'Invalid or expired refresh token',
+    INVALID_CURRENT_PASSWORD: 'Current password is incorrect',
+    PASSWORD_UPDATED: 'Password updated successfully',
+    TWO_FACTOR_ALREADY_ENABLED: '2FA is already enabled for this account',
+    TWO_FACTOR_NOT_ENABLED: '2FA is not enabled for this account',
+    INVALID_2FA_TOKEN: 'Invalid 2FA token',
+    TWO_FACTOR_DISABLED: '2FA has been disabled successfully',
   },
 };

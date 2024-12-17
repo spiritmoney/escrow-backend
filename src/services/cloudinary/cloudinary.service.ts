@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, InternalServerErrorException, Inject } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { systemResponses } from '../../contracts/system.responses';
-import { v2 as cloudinary } from 'cloudinary';
+import { v2 } from 'cloudinary';
 import { Readable } from 'stream';
 import { Express } from 'express';
 
@@ -9,16 +9,9 @@ import { Express } from 'express';
 export class CloudinaryService {
   constructor(
     private configService: ConfigService,
-    @Inject('CLOUDINARY') private readonly cloudinaryInstance: typeof cloudinary
+    @Inject('CLOUDINARY') private cloudinary: typeof v2
   ) {
-    // Verify Cloudinary configuration
-    try {
-      if (!this.cloudinaryInstance.config().cloud_name) {
-        throw new Error('Invalid configuration');
-      }
-    } catch (error) {
-      throw new InternalServerErrorException(systemResponses.EN.CLOUDINARY_CONFIG_ERROR);
-    }
+    // Remove configuration from constructor since it's done in the provider
   }
 
   async uploadFile(file: Express.Multer.File, folder: string): Promise<{ url: string }> {
@@ -59,7 +52,7 @@ export class CloudinaryService {
     folder: string
   ): Promise<any> {
     return new Promise((resolve, reject) => {
-      const uploadStream = this.cloudinaryInstance.uploader.upload_stream(
+      const uploadStream = this.cloudinary.uploader.upload_stream(
         {
           folder: `espeepay/${folder}`,
           resource_type: 'auto',
@@ -94,7 +87,7 @@ export class CloudinaryService {
         throw new BadRequestException(systemResponses.EN.FILE_NOT_FOUND);
       }
 
-      const result = await this.cloudinaryInstance.uploader.destroy(publicId);
+      const result = await this.cloudinary.uploader.destroy(publicId);
       
       if (result.result !== 'ok') {
         throw new Error(systemResponses.EN.FILE_DELETE_FAILED);
@@ -115,7 +108,7 @@ export class CloudinaryService {
         throw new BadRequestException(systemResponses.EN.FILE_NOT_FOUND);
       }
 
-      const result = await this.cloudinaryInstance.api.resource(publicId);
+      const result = await this.cloudinary.api.resource(publicId);
       return result;
     } catch (error) {
       if (error instanceof BadRequestException) {

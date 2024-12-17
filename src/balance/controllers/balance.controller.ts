@@ -7,7 +7,7 @@ import { ConversionService } from '../services/conversion.service';
 import { SendMoneyDto, RequestPaymentDto, TransactionType } from '../dto/balance.dto';
 import { ConvertCurrencyDto, ConversionResponse } from '../dto/conversion.dto';
 import { systemResponses } from '../../contracts/system.responses';
-import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
+import { BlockchainService } from '../../services/blockchain/blockchain.service';
 
 @ApiTags('balance')
 @ApiBearerAuth()
@@ -15,8 +15,9 @@ import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
 @Controller('balance')
 export class BalanceController {
   constructor(
-    private balanceService: BalanceService,
-    private conversionService: ConversionService,
+    private readonly balanceService: BalanceService,
+    private readonly conversionService: ConversionService,
+    private readonly blockchainService: BlockchainService
   ) {}
 
   @Get()
@@ -109,56 +110,67 @@ export class BalanceController {
   @ApiOperation({ summary: 'Convert between currencies' })
   @ApiResponse({
     status: 200,
-    description: 'Currency converted successfully',
-    type: ConversionResponse,
-    schema: {
-      example: {
-        convertedAmount: 1800.00,
-        rate: 1800,
-        from: 'ESP',
-        to: 'NGN'
-      }
-    }
+    description: 'Currency conversion successful',
+    type: ConversionResponse
   })
-  @ApiResponse({ status: 400, description: systemResponses.EN.INVALID_CONVERSION_PAIR })
-  @ApiResponse({ status: 401, description: systemResponses.EN.AUTHENTICATION_FAILED })
-  async convertCurrency(@CurrentUser() user, @Body() convertDto: ConvertCurrencyDto) {
+  async convertCurrency(
+    @Body() convertDto: ConvertCurrencyDto
+  ): Promise<ConversionResponse> {
+    const convertedAmount = await this.conversionService.convertAmount(
+      convertDto.amount,
+      convertDto.from,
+      convertDto.to
+    );
+
+    const rate = this.conversionService.getConversionRate(
+      convertDto.from,
+      convertDto.to
+    );
+
+    return {
+      convertedAmount,
+      rate,
+      from: convertDto.from,
+      to: convertDto.to
+    };
+  }
+
+  @Get('convert')
+  @UseGuards(JwtAuthGuard)
+  async convertAmount(
+    @Query('amount') amount: number,
+    @Query('from') fromCurrency: string,
+    @Query('to') toCurrency: string
+  ) {
     try {
-      return await this.conversionService.convertCurrency(
-        user.id,
-        convertDto.from,
-        convertDto.to,
-        convertDto.amount
+      return await this.conversionService.convertAmount(
+        amount,
+        fromCurrency,
+        toCurrency
       );
     } catch (error) {
-      throw new BadRequestException(error.message || systemResponses.EN.CONVERSION_FAILED);
+      throw new BadRequestException(error.message);
     }
   }
 
   @Get('rates')
-  @ApiOperation({ summary: 'Get current conversion rates' })
-  @ApiResponse({
-    status: 200,
-    description: 'Current conversion rates',
-    schema: {
-      example: {
-        ESP: {
-          NGN: 1800,
-          USD: 1,
-          EUR: 1,
-        }
-      }
+  @UseGuards(JwtAuthGuard)
+  async getExchangeRates(@Query('base') baseCurrency: string) {
+    try {
+      return await this.conversionService.getLatestRates(baseCurrency);
+    } catch (error) {
+      throw new BadRequestException(error.message);
     }
-  })
-  @ApiResponse({ status: 401, description: systemResponses.EN.AUTHENTICATION_FAILED })
-  async getConversionRates() {
-    return {
-      ESP: {
-        NGN: 1800,
-        USD: 1,
-        EUR: 1,
-      },
-    };
+  }
+
+  @Get('crypto/price')
+  @UseGuards(JwtAuthGuard)
+  async getCryptoPrice(@Query('symbol') symbol: string) {
+    try {
+      return await this.conversionService.getCryptoUsdPrice(symbol);
+    } catch (error) {
+      throw new BadRequestException(error.message);
+    }
   }
 
   @Get('recent-activity')

@@ -15,30 +15,12 @@ export class UserRepository implements IUserRepository {
     });
   }
 
-  async create(userData: any, walletAddress: string): Promise<User> {
-    try {
-      return await this.prisma.user.create({
-        data: {
-          id: userData.id,
-          email: userData.email,
-          password: userData.password,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-          country: userData.country,
-          organisation: userData.organisation,
-          role: userData.role,
-          walletAddress,
-          otp: userData.otp,
-          otpExpiry: userData.otpExpiry,
-        },
-      });
-    } catch (error) {
-      console.error('User creation error:', error);
-      if (error.code === 'P2002') {
-        throw new BadRequestException(systemResponses.EN.USER_EMAIL_EXISTS);
-      }
-      throw new BadRequestException(error.message || 'Error creating user');
-    }
+  async create(userData: any): Promise<User> {
+    return this.prisma.user.create({
+      data: {
+        ...userData,
+      },
+    });
   }
 
   async verifyEmail(userId: string): Promise<User> {
@@ -80,6 +62,35 @@ export class UserRepository implements IUserRepository {
     return this.prisma.user.update({
       where: { id: userId },
       data: { walletAddress },
+    });
+  }
+
+  async update2FASecret(userId: string, secret: string): Promise<User> {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorSecret: secret,
+        twoFactorEnabled: false
+      }
+    });
+  }
+
+  async enable2FA(userId: string): Promise<User> {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: true
+      }
+    });
+  }
+
+  async disable2FA(userId: string): Promise<User> {
+    return this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        twoFactorEnabled: false,
+        twoFactorSecret: null
+      }
     });
   }
 } 

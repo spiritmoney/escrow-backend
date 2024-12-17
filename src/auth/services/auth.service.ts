@@ -1,21 +1,33 @@
 import { Injectable, BadRequestException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
-import { IAuthService, RegisterResponse } from '../interfaces/auth.interface';
+import { IAuthService, RegisterResponse, UserWallet } from '../interfaces/auth.interface';
 import { UserRepository } from '../repositories/user.repository';
-import { LoginDto, RegisterDto, VerifyOtpDto, RequestPasswordResetDto, ResetPasswordDto } from '../dto/auth.dto';
-import { WalletService } from '../../wallet/wallet.service';
+import {
+  LoginDto,
+  RegisterDto,
+  VerifyOtpDto,
+  RequestPasswordResetDto,
+  ResetPasswordDto,
+} from '../dto/auth.dto';
 import { NodemailerService } from '../../services/nodemailer/NodemailerService';
 import { systemResponses } from '../../contracts/system.responses';
 import * as bcrypt from 'bcrypt';
 import { generateApiKey } from '../../utils/api-key.util';
 import { PrismaService } from '../../prisma/prisma.service';
+import { MultiChainWalletService } from '../../wallet/services/multi-chain-wallet.service';
+import { UserRole } from '../../contracts/roles.contract';
+import { SUPPORTED_CRYPTOCURRENCIES } from '../../wallet/constants/crypto.constants';
+import { SUPPORTED_NETWORKS } from '../../wallet/constants/crypto.constants';
+import { NetworkConfig, TokenDetails } from '../../wallet/interfaces/chain-wallet.interface';
+import * as speakeasy from 'speakeasy';
+import * as QRCode from 'qrcode';
 
 @Injectable()
 export class AuthService implements IAuthService {
   constructor(
     private userRepository: UserRepository,
     private jwtService: JwtService,
-    private walletService: WalletService,
+    private multiChainWalletService: MultiChainWalletService,
     private emailService: NodemailerService,
     private prisma: PrismaService,
   ) {}
@@ -42,7 +54,9 @@ export class AuthService implements IAuthService {
       });
     } catch (error) {
       console.error('Failed to send verification email:', error);
-      throw new Error('Failed to send verification email. Please try again later.');
+      throw new Error(
+        'Failed to send verification email. Please try again later.',
+      );
     }
   }
 
@@ -62,34 +76,133 @@ export class AuthService implements IAuthService {
   async validateUser(email: string, password: string): Promise<any> {
     const user = await this.userRepository.findByEmail(email);
     if (!user) {
-      throw new Error(systemResponses.EN.AUTHENTICATION_FAILED);
+      throw new BadRequestException(systemResponses.EN.AUTHENTICATION_FAILED);
     }
-    
+
     if (!user.isVerified) {
-      throw new Error(systemResponses.EN.EMAIL_VERIFICATION_REQUIRED);
+      throw new BadRequestException(systemResponses.EN.EMAIL_VERIFICATION_REQUIRED);
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
     if (!isPasswordValid) {
-      throw new Error(systemResponses.EN.AUTHENTICATION_FAILED);
+      throw new BadRequestException(systemResponses.EN.AUTHENTICATION_FAILED);
     }
 
     const { password: _, ...result } = user;
     return result;
   }
 
+  async refreshToken(refreshToken: string): Promise<{ access_token: string }> {
+    try {
+      const decoded = this.jwtService.verify(refreshToken);
+      const user = await this.userRepository.findById(decoded.sub);
+
+      if (!user) {
+        throw new BadRequestException(systemResponses.EN.INVALID_REFRESH_TOKEN);
+      }
+
+      const payload = {
+        email: user.email,
+        sub: user.id,
+        role: user.role,
+        organisation: user.organisation
+      };
+
+      return {
+        access_token: this.jwtService.sign(payload)
+      };
+    } catch {
+      throw new BadRequestException(systemResponses.EN.INVALID_REFRESH_TOKEN);
+    }
+  }
+
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string
+  ): Promise<{ message: string }> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new BadRequestException(systemResponses.EN.USER_NOT_FOUND);
+    }
+
+    const isPasswordValid = await bcrypt.compare(currentPassword, user.password);
+    if (!isPasswordValid) {
+      throw new BadRequestException(systemResponses.EN.INVALID_CURRENT_PASSWORD);
+    }
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await this.userRepository.updatePassword(userId, hashedPassword);
+
+    return { message: systemResponses.EN.PASSWORD_UPDATED };
+  }
+
+  async enable2FA(userId: string): Promise<{ secret: string; qrCode: string }> {
+    const user = await this.userRepository.findById(userId);
+    if (!user) {
+      throw new BadRequestException(systemResponses.EN.USER_NOT_FOUND);
+    }
+
+    if (user.twoFactorEnabled) {
+      throw new BadRequestException(systemResponses.EN.TWO_FACTOR_ALREADY_ENABLED);
+    }
+
+    const secret = speakeasy.generateSecret();
+    const qrCode = await QRCode.toDataURL(secret.otpauth_url);
+
+    await this.userRepository.update2FASecret(userId, secret.base32);
+
+    return {
+      secret: secret.base32,
+      qrCode
+    };
+  }
+
+  async verify2FA(userId: string, token: string): Promise<boolean> {
+    const user = await this.userRepository.findById(userId);
+    if (!user || !user.twoFactorSecret) {
+      throw new BadRequestException(systemResponses.EN.TWO_FACTOR_NOT_ENABLED);
+    }
+
+    const isValid = speakeasy.totp.verify({
+      secret: user.twoFactorSecret,
+      encoding: 'base32',
+      token
+    });
+
+    if (!isValid) {
+      throw new BadRequestException(systemResponses.EN.INVALID_2FA_TOKEN);
+    }
+
+    if (!user.twoFactorEnabled) {
+      await this.userRepository.enable2FA(userId);
+    }
+
+    return true;
+  }
+
+  async disable2FA(userId: string, token: string): Promise<{ message: string }> {
+    const isValid = await this.verify2FA(userId, token);
+    if (!isValid) {
+      throw new BadRequestException(systemResponses.EN.INVALID_2FA_TOKEN);
+    }
+
+    await this.userRepository.disable2FA(userId);
+    return { message: systemResponses.EN.TWO_FACTOR_DISABLED };
+  }
+
   async login(user: any) {
     try {
-      const payload = { 
-        email: user.email, 
-        sub: user.id, 
+      const payload = {
+        email: user.email,
+        sub: user.id,
         role: user.role,
         organisation: user.organisation,
-        iat: Math.floor(Date.now() / 1000)
+        iat: Math.floor(Date.now() / 1000),
       };
-      
+
       const apiSettings = await this.prisma.apiSettings.findUnique({
-        where: { userId: user.id }
+        where: { userId: user.id },
       });
 
       if (!apiSettings) {
@@ -108,9 +221,9 @@ export class AuthService implements IAuthService {
           lastName: user.lastName,
           organisation: user.organisation,
           role: user.role,
-          walletAddress: user.walletAddress
+          walletAddress: user.walletAddress,
         },
-        message: systemResponses.EN.LOGIN_SUCCESS
+        message: systemResponses.EN.LOGIN_SUCCESS,
       };
     } catch (error) {
       if (error.message === systemResponses.EN.API_KEY_NOT_FOUND) {
@@ -128,29 +241,22 @@ export class AuthService implements IAuthService {
         throw new BadRequestException(systemResponses.EN.USER_EMAIL_EXISTS);
       }
 
-      // Generate user ID and wallet
-      const userId = this.walletService.generateUserId();
+      // Generate user ID and OTP
+      const userId = crypto.randomUUID();
       const otp = this.generateOTP();
       const otpExpiry = new Date(Date.now() + 15 * 60 * 1000);
       const hashedPassword = await bcrypt.hash(registerDto.password, 10);
-      
-      // Generate wallet details
-      const { address: walletAddress, encryptedPrivateKey, iv } = 
-        await this.walletService.generateWallet();
 
       // Create user transaction
       const newUser = await this.prisma.$transaction(async (prisma) => {
-        // Create user
-        const user = await this.userRepository.create(
-          {
-            id: userId,
-            ...registerDto,
-            password: hashedPassword,
-            otp,
-            otpExpiry,
-          },
-          walletAddress
-        );
+        // Create user first
+        const user = await this.userRepository.create({
+          id: userId,
+          ...registerDto,
+          password: hashedPassword,
+          otp,
+          otpExpiry,
+        });
 
         // Generate and create API key
         const apiKey = generateApiKey();
@@ -174,8 +280,11 @@ export class AuthService implements IAuthService {
           },
         });
 
-        // Create wallet
-        await this.walletService.createWallet(userId);
+        // Create multi-chain wallets
+        await this.multiChainWalletService.createUserWallets(user.id);
+
+        // Create custodial wallets for supported chains and tokens
+        await this.createCustodialWallets(user.id, prisma);
 
         return { user, apiKey };
       });
@@ -183,19 +292,37 @@ export class AuthService implements IAuthService {
       // Send verification email
       await this.sendVerificationEmail(registerDto.email, otp);
 
-      const { password, otp: _, otpExpiry: __, ...result } = newUser.user;
-      
-      return {
-        user: result,
-        wallet: {
-          address: walletAddress,
-          encryptedPrivateKey,
-          iv,
-        },
-        apiKey: newUser.apiKey,
-        message: systemResponses.EN.USER_CREATED
+      // Return response with wallets
+      const wallets = await this.prisma.wallet.findMany({
+        where: { userId: newUser.user.id },
+        select: {
+          address: true,
+          encryptedPrivateKey: true,
+          iv: true,
+          network: true,
+          type: true,
+          chainId: true
+        }
+      });
+
+      // Map user data excluding sensitive information
+      const mappedUserData = {
+        id: newUser.user.id,
+        email: newUser.user.email,
+        firstName: newUser.user.firstName,
+        lastName: newUser.user.lastName,
+        organisation: newUser.user.organisation,
+        role: newUser.user.role as UserRole,
+        isVerified: false,
+        createdAt: newUser.user.createdAt,
       };
 
+      return {
+        user: mappedUserData,
+        wallets: wallets as UserWallet[],
+        apiKey: newUser.apiKey,
+        message: systemResponses.EN.USER_CREATED,
+      };
     } catch (error) {
       console.error('Registration error:', error);
 
@@ -208,8 +335,34 @@ export class AuthService implements IAuthService {
       }
 
       throw new BadRequestException(
-        error.message || systemResponses.EN.USER_CREATION_ERROR
+        error.message || systemResponses.EN.USER_CREATION_ERROR,
       );
+    }
+  }
+
+  private async createCustodialWallets(userId: string, prisma: any) {
+    const supportedTokens: Record<string, TokenDetails> = SUPPORTED_CRYPTOCURRENCIES;
+    const supportedNetworks: Record<string, NetworkConfig> = SUPPORTED_NETWORKS;
+
+    for (const [networkKey, network] of Object.entries(supportedNetworks)) {
+      if (!network.tokens || !Array.isArray(network.tokens)) continue;
+
+      for (const token of network.tokens) {
+        const tokenDetails = supportedTokens[token];
+        if (!tokenDetails) continue;
+
+        await prisma.custodialWallet.create({
+          data: {
+            userId,
+            token,
+            chainId: network.chainId || 1, // Default to 1 if not specified
+            balance: '0',
+            status: 'ACTIVE',
+            network: network.name || networkKey,
+            tokenDecimals: tokenDetails.decimals || 18 // Default to 18 if not specified
+          }
+        });
+      }
     }
   }
 
@@ -238,7 +391,7 @@ export class AuthService implements IAuthService {
     await this.userRepository.verifyEmail(user.id);
 
     return {
-      message: systemResponses.EN.EMAIL_VERIFICATION_SUCCESS
+      message: systemResponses.EN.EMAIL_VERIFICATION_SUCCESS,
     };
   }
 
@@ -280,4 +433,4 @@ export class AuthService implements IAuthService {
 
     return { message: systemResponses.EN.PASSWORD_RESET_SUCCESS };
   }
-} 
+}

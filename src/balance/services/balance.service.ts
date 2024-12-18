@@ -1,4 +1,8 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserRepository } from '../../auth/repositories/user.repository';
@@ -8,20 +12,30 @@ import { SendMoneyDto, RequestPaymentDto, AssetType } from '../dto/balance.dto';
 import { ethers } from 'ethers';
 import { systemResponses } from '../../contracts/system.responses';
 import { NodemailerService } from '../../services/nodemailer/NodemailerService';
-import { SUPPORTED_CRYPTOCURRENCIES, SUPPORTED_NETWORKS, TOKEN_ADDRESS_MAP } from '../../wallet/constants/crypto.constants';
+import {
+  SUPPORTED_CRYPTOCURRENCIES,
+  SUPPORTED_NETWORKS,
+  TOKEN_ADDRESS_MAP,
+} from '../../wallet/constants/crypto.constants';
 import { WalletType } from 'src/wallet/enums/wallet.enum';
+import { UserRole } from '@prisma/client';
 
 type Currency = 'NGN' | 'USD' | 'EUR' | 'ESP';
 
 @Injectable()
 export class BalanceService implements IBalanceService {
+  private readonly isSandbox: boolean;
+
   constructor(
     private prisma: PrismaService,
     private userRepository: UserRepository,
     private multiChainWalletService: MultiChainWalletService,
     private configService: ConfigService,
     private nodeMailerService: NodemailerService,
-  ) {}
+  ) {
+    // Always true for prototyping
+    this.isSandbox = true;
+  }
 
   async getBalances(userId: string): Promise<UserBalances> {
     try {
@@ -73,22 +87,28 @@ export class BalanceService implements IBalanceService {
     }
   }
 
-  private async handleFiatTransfer(sender: any, transferDetails: SendMoneyDto): Promise<any> {
+  private async handleFiatTransfer(
+    sender: any,
+    transferDetails: SendMoneyDto,
+  ): Promise<any> {
     if (!transferDetails.currency) {
       throw new BadRequestException(systemResponses.EN.INVALID_CURRENCY);
     }
 
+    // Ensure recipient is a registered user by checking email
     if (!transferDetails.recipientAddress.includes('@')) {
       throw new BadRequestException(systemResponses.EN.INVALID_RECIPIENT);
     }
 
-    if (sender.email === transferDetails.recipientAddress) {
-      throw new BadRequestException(systemResponses.EN.SELF_TRANSFER_NOT_ALLOWED);
-    }
-
-    const recipient = await this.userRepository.findByEmail(transferDetails.recipientAddress);
+    const recipient = await this.userRepository.findByEmail(
+      transferDetails.recipientAddress,
+    );
     if (!recipient) {
       throw new NotFoundException(systemResponses.EN.RECIPIENT_NOT_FOUND);
+    }
+
+    if (sender.email === transferDetails.recipientAddress) {
+      throw new BadRequestException(systemResponses.EN.SELF_TRANSFER_NOT_ALLOWED);
     }
 
     const senderBalance = await this.prisma.balance.findUnique({
@@ -101,16 +121,8 @@ export class BalanceService implements IBalanceService {
     }
 
     try {
-      // Create default customer for system transaction
-      const defaultCustomer = await this.prisma.customer.create({
-        data: {
-          email: 'system@example.com',
-          name: 'System Transaction'
-        }
-      });
-
       await this.prisma.$transaction([
-        // Update balances
+        // Update sender's balance
         this.prisma.balance.update({
           where: { userId: sender.id },
           data: {
@@ -119,6 +131,7 @@ export class BalanceService implements IBalanceService {
             },
           },
         }),
+        // Update recipient's balance
         this.prisma.balance.update({
           where: { userId: recipient.id },
           data: {
@@ -127,12 +140,11 @@ export class BalanceService implements IBalanceService {
             },
           },
         }),
-        // Create transaction with customer relation
+        // Create transaction record
         this.prisma.transaction.create({
           data: {
             sender: { connect: { id: sender.id } },
             recipient: { connect: { id: recipient.id } },
-            customer: { connect: { id: defaultCustomer.id } },
             amount: transferDetails.amount,
             currency: transferDetails.currency,
             type: 'FIAT',
@@ -148,101 +160,52 @@ export class BalanceService implements IBalanceService {
     }
   }
 
-  private async handleCryptoTransfer(sender: any, transferDetails: SendMoneyDto): Promise<any> {
+  private async handleCryptoTransfer(
+    sender: any,
+    transferDetails: SendMoneyDto,
+  ): Promise<any> {
     try {
       // Validate wallet address
       if (!ethers.isAddress(transferDetails.recipientAddress)) {
         throw new BadRequestException(systemResponses.EN.INVALID_WALLET_ADDRESS);
       }
 
-      // Get sender's wallet for the appropriate network
-      const senderWallet = await this.prisma.wallet.findFirst({
-        where: { 
-          userId: sender.id,
-          type: this.getWalletTypeForCurrency(transferDetails.currency)
-        }
-      });
+      // Simulate blockchain delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
 
-      if (!senderWallet) {
-        throw new BadRequestException(systemResponses.EN.WALLET_NOT_FOUND);
-      }
+      // Generate a fake transaction hash
+      const fakeTransactionHash = '0x' + Array(64).fill('0123456789ABCDEF').map(x => x[Math.floor(Math.random() * x.length)]).join('');
 
-      // Create default customer for crypto transaction
-      const defaultCustomer = await this.prisma.customer.create({
+      // Update sender's balance in database
+      await this.prisma.balance.update({
+        where: { userId: sender.id },
         data: {
-          email: 'system@example.com',
-          name: 'Crypto Transaction'
-        }
+          [transferDetails.currency.toLowerCase()]: {
+            decrement: transferDetails.amount,
+          },
+        },
       });
 
-      // Convert amount to proper decimals
-      const amountInWei = this.convertToTokenDecimals(
-        transferDetails.amount,
-        transferDetails.currency
-      );
-
-      // Get token address if needed
-      const tokenAddress = this.getTokenAddress(
-        transferDetails.currency,
-        senderWallet.chainId
-      );
-
-      // Execute transfer
-      const txReceipt = tokenAddress 
-        ? await this.multiChainWalletService.transferToken(
-            senderWallet.type as WalletType,
-            senderWallet.address,
-            transferDetails.recipientAddress,
-            tokenAddress,
-            amountInWei.toString(),
-            senderWallet.encryptedPrivateKey,
-            senderWallet.iv
-          )
-        : await this.multiChainWalletService.transferNative(
-            senderWallet.type as WalletType,
-            senderWallet.address,
-            transferDetails.recipientAddress,
-            amountInWei.toString()
-          );
-
-      // Record transaction
-      await this.prisma.$transaction([
-        this.prisma.balance.update({
-          where: { userId: sender.id },
-          data: {
-            [transferDetails.currency.toLowerCase()]: {
-              decrement: transferDetails.amount,
-            },
-          },
-        }),
-        this.prisma.transaction.create({
-          data: {
-            sender: { connect: { id: sender.id } },
-            recipientWallet: transferDetails.recipientAddress,
-            customer: { connect: { id: defaultCustomer.id } },
-            amount: transferDetails.amount,
-            currency: transferDetails.currency,
-            type: 'CRYPTO',
-            status: 'COMPLETED',
-            note: transferDetails.note || '',
-            txHash: txReceipt.hash,
-            chainId: senderWallet.chainId,
-            tokenAddress,
-          },
-        }),
-      ]);
+      // Record simulated transaction
+      await this.prisma.transaction.create({
+        data: {
+          sender: { connect: { id: sender.id } },
+          recipientWallet: transferDetails.recipientAddress,
+          amount: transferDetails.amount,
+          currency: transferDetails.currency,
+          type: 'CRYPTO',
+          status: 'COMPLETED',
+          note: transferDetails.note || '',
+          txHash: fakeTransactionHash,
+          chainId: 1, // Simulated mainnet
+        },
+      });
 
       return {
         message: systemResponses.EN.TRANSFER_SUCCESSFUL,
-        transactionHash: txReceipt.hash,
+        transactionHash: fakeTransactionHash,
       };
     } catch (error) {
-      // Handle failed transaction
-      await this.recordFailedTransaction(
-        sender.id,
-        transferDetails,
-        error.message
-      );
       throw new BadRequestException(systemResponses.EN.CRYPTO_TRANSFER_FAILED);
     }
   }
@@ -250,7 +213,9 @@ export class BalanceService implements IBalanceService {
   private getWalletTypeForCurrency(currency: string): WalletType {
     const crypto = SUPPORTED_CRYPTOCURRENCIES[currency];
     if (!crypto) {
-      throw new BadRequestException(systemResponses.EN.UNSUPPORTED_CRYPTOCURRENCY);
+      throw new BadRequestException(
+        systemResponses.EN.UNSUPPORTED_CRYPTOCURRENCY,
+      );
     }
 
     // Return appropriate wallet type based on the primary network
@@ -276,7 +241,7 @@ export class BalanceService implements IBalanceService {
 
     // Get network by chainId
     const network = Object.values(SUPPORTED_NETWORKS).find(
-      n => n.chainId === chainId
+      (n) => n.chainId === chainId,
     );
     if (!network) {
       throw new BadRequestException(systemResponses.EN.UNSUPPORTED_NETWORK);
@@ -284,7 +249,9 @@ export class BalanceService implements IBalanceService {
 
     const tokenAddresses = TOKEN_ADDRESS_MAP[network.name];
     if (!tokenAddresses || !tokenAddresses[currency]) {
-      throw new BadRequestException(systemResponses.EN.UNSUPPORTED_TOKEN_NETWORK);
+      throw new BadRequestException(
+        systemResponses.EN.UNSUPPORTED_TOKEN_NETWORK,
+      );
     }
 
     return tokenAddresses[currency];
@@ -293,25 +260,30 @@ export class BalanceService implements IBalanceService {
   private convertToTokenDecimals(amount: number, currency: string): bigint {
     const crypto = SUPPORTED_CRYPTOCURRENCIES[currency];
     if (!crypto) {
-      throw new BadRequestException(systemResponses.EN.UNSUPPORTED_CRYPTOCURRENCY);
+      throw new BadRequestException(
+        systemResponses.EN.UNSUPPORTED_CRYPTOCURRENCY,
+      );
     }
 
-    return ethers.parseUnits(
-      amount.toString(),
-      crypto.decimals
-    );
+    return ethers.parseUnits(amount.toString(), crypto.decimals);
   }
 
   private async recordFailedTransaction(
     senderId: string,
     transferDetails: SendMoneyDto,
-    errorMessage: string
+    errorMessage: string,
   ): Promise<void> {
-    const defaultCustomer = await this.prisma.customer.create({
+    const defaultCustomer = await this.prisma.user.create({
       data: {
         email: 'system@example.com',
-        name: 'Failed Transaction'
-      }
+        firstName: 'System',
+        lastName: '',
+        password: '',
+        country: '',
+        organisation: '',
+        name: 'System',
+        role: UserRole.DEVELOPER,
+      },
     });
 
     await this.prisma.transaction.create({
@@ -328,7 +300,10 @@ export class BalanceService implements IBalanceService {
     });
   }
 
-  async requestPayment(userId: string, requestDetails: RequestPaymentDto): Promise<any> {
+  async requestPayment(
+    userId: string,
+    requestDetails: RequestPaymentDto,
+  ): Promise<any> {
     const requester = await this.userRepository.findById(userId);
     if (!requester) {
       throw new NotFoundException('Requester not found');
@@ -372,10 +347,14 @@ export class BalanceService implements IBalanceService {
     };
   }
 
-  async transferCrypto(senderId: string, recipientAddress: string, amount: number) {
+  async transferCrypto(
+    senderId: string,
+    recipientAddress: string,
+    amount: number,
+  ) {
     try {
       const senderWallet = await this.prisma.wallet.findFirst({
-        where: { userId: senderId }
+        where: { userId: senderId },
       });
 
       if (!senderWallet) {
@@ -385,7 +364,7 @@ export class BalanceService implements IBalanceService {
       const txReceipt = await this.multiChainWalletService.transferESP(
         senderWallet.address,
         recipientAddress,
-        BigInt(amount)
+        BigInt(amount),
       );
 
       return txReceipt;
@@ -398,30 +377,27 @@ export class BalanceService implements IBalanceService {
     try {
       const transactions = await this.prisma.transaction.findMany({
         where: {
-          OR: [
-            { senderId: userId },
-            { recipientId: userId }
-          ]
+          OR: [{ senderId: userId }, { recipientId: userId }],
         },
         orderBy: {
-          createdAt: 'desc'
+          createdAt: 'desc',
         },
         take: 10,
         include: {
           sender: {
             select: {
-              email: true
-            }
+              email: true,
+            },
           },
           recipient: {
             select: {
-              email: true
-            }
-          }
-        }
+              email: true,
+            },
+          },
+        },
       });
 
-      return transactions.map(tx => ({
+      return transactions.map((tx) => ({
         type: tx.senderId === userId ? 'SENT' : 'RECEIVED',
         currency: tx.currency,
         amount: tx.amount,
@@ -429,7 +405,10 @@ export class BalanceService implements IBalanceService {
         note: tx.note,
         status: tx.status,
         ...(tx.type === 'CRYPTO' && { txHash: tx.txHash }),
-        counterparty: tx.senderId === userId ? tx.recipient?.email || tx.recipientWallet : tx.sender?.email
+        counterparty:
+          tx.senderId === userId
+            ? tx.recipient?.email || tx.recipientWallet
+            : tx.sender?.email,
       }));
     } catch (error) {
       throw new BadRequestException(systemResponses.EN.INTERNAL_SERVER_ERROR);
@@ -445,11 +424,17 @@ export class BalanceService implements IBalanceService {
     note?: string;
   }) {
     // Create a default customer for balance transactions
-    const defaultCustomer = await this.prisma.customer.create({
+    const defaultCustomer = await this.prisma.user.create({
       data: {
         email: 'system@example.com',
-        name: 'System Transaction'
-      }
+        firstName: 'System',
+        lastName: '',
+        password: '',
+        country: '',
+        organisation: '',
+        name: 'System',
+        role: UserRole.DEVELOPER,
+      },
     });
 
     return this.prisma.transaction.create({
@@ -467,7 +452,7 @@ export class BalanceService implements IBalanceService {
         sender: true,
         recipient: true,
         customer: true,
-      }
+      },
     });
   }
-} 
+}

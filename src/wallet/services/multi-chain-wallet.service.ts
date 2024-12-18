@@ -47,53 +47,52 @@ export class MultiChainWalletService {
 
   async createUserWallets(userId: string): Promise<void> {
     try {
-      const walletPromises = Array.from(this.chainServices.entries()).map(
-        async ([walletType, service]) => {
-          try {
-            const wallet = await service.generateWallet();
-            
-            // Create personal wallet
-            const personalWallet = await this.prisma.wallet.create({
-              data: {
-                userId,
-                address: wallet.address,
-                encryptedPrivateKey: wallet.encryptedPrivateKey,
-                iv: wallet.iv,
-                network: wallet.network,
-                type: walletType.toString(),
-                chainId: wallet.chainId,
-              },
-            });
+      // Process wallets sequentially instead of in parallel to avoid race conditions
+      for (const [walletType, service] of this.chainServices.entries()) {
+        try {
+          const wallet = await service.generateWallet();
+          
+          // Create personal wallet
+          const personalWallet = await this.prisma.wallet.create({
+            data: {
+              userId,
+              address: wallet.address,
+              encryptedPrivateKey: wallet.encryptedPrivateKey,
+              iv: wallet.iv,
+              network: wallet.network,
+              type: walletType.toString(),
+              chainId: wallet.chainId,
+            },
+          });
 
-            // Create custodial wallet for this chain
-            await this.prisma.custodialWallet.create({
-              data: {
-                user: {
-                  connect: {
-                    id: userId
-                  }
-                },
-                address: wallet.address,
+          // Use upsert instead of create for custodial wallet
+          await this.prisma.custodialWallet.upsert({
+            where: {
+              userId_token_chainId: {
+                userId,
                 chainId: wallet.chainId,
-                network: wallet.network,
-                type: 'CUSTODIAL',
-                status: 'ACTIVE',
-                balance: '0',
                 token: this.getDefaultTokenForChain(wallet.chainId)
               }
-            });
-
-            return personalWallet;
-          } catch (error) {
-            this.logger.error(`Failed to create ${walletType} wallet:`, error);
-            throw new BadRequestException(
-              `${systemResponses.EN.WALLET_CREATION_ERROR}: ${walletType}`
-            );
-          }
-        },
-      );
-
-      await Promise.all(walletPromises);
+            },
+            update: {}, // No updates needed if it exists
+            create: {
+              userId,
+              address: wallet.address,
+              chainId: wallet.chainId,
+              network: wallet.network,
+              type: 'CUSTODIAL',
+              status: 'ACTIVE',
+              balance: '0',
+              token: this.getDefaultTokenForChain(wallet.chainId)
+            }
+          });
+        } catch (error) {
+          this.logger.error(`Failed to create ${walletType} wallet:`, error);
+          throw new BadRequestException(
+            `${systemResponses.EN.WALLET_CREATION_ERROR}: ${walletType}`
+          );
+        }
+      }
     } catch (error) {
       this.logger.error('Error creating user wallets:', error);
       if (error instanceof BadRequestException) {

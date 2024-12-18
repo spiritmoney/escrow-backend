@@ -255,9 +255,7 @@ export class AuthService implements IAuthService {
   async register(registerDto: RegisterDto): Promise<RegisterResponse> {
     try {
       // Check for existing user
-      const existingUser = await this.userRepository.findByEmail(
-        registerDto.email,
-      );
+      const existingUser = await this.userRepository.findByEmail(registerDto.email);
       if (existingUser) {
         throw new BadRequestException(systemResponses.EN.USER_EMAIL_EXISTS);
       }
@@ -268,47 +266,61 @@ export class AuthService implements IAuthService {
       const otpExpiry = new Date(Date.now() + 15 * 60 * 1000);
       const hashedPassword = await bcrypt.hash(registerDto.password, 10);
 
-      // Create user transaction
-      const newUser = await this.prisma.$transaction(async (prisma) => {
-        // Create user first
-        const user = await this.userRepository.create({
-          id: userId,
-          ...registerDto,
-          password: hashedPassword,
-          otp,
-          otpExpiry,
-        });
+      // Create user transaction with increased timeout
+      const newUser = await this.prisma.$transaction(
+        async (prisma) => {
+          // Create user first
+          const user = await this.userRepository.create({
+            id: userId,
+            ...registerDto,
+            password: hashedPassword,
+            otp,
+            otpExpiry,
+          });
 
-        // Generate and create API key
-        const apiKey = generateApiKey();
-        await prisma.apiSettings.create({
-          data: {
-            userId: user.id,
-            apiKey,
-            apiAccess: true,
-            webhookNotifications: false,
-          },
-        });
+          // Generate and create API key
+          const apiKey = generateApiKey();
+          await prisma.apiSettings.create({
+            data: {
+              userId: user.id,
+              apiKey,
+              apiAccess: true,
+              webhookNotifications: false,
+            },
+          });
 
-        // Create initial balance record
-        await prisma.balance.create({
-          data: {
-            userId: user.id,
-            ngn: 0,
-            usd: 0,
-            eur: 0,
-            esp: 0,
-          },
-        });
+          // Create initial balance record
+          await prisma.balance.create({
+            data: {
+              userId: user.id,
+              ngn: 0,
+              usd: 0,
+              eur: 0,
+              esp: 0,
+            },
+          });
 
-        // Create multi-chain wallets
-        await this.multiChainWalletService.createUserWallets(user.id);
+          return { user, apiKey };
+        },
+        {
+          timeout: 30000, // Increased to 30 seconds
+          maxWait: 10000,
+        }
+      );
 
-        // Create custodial wallets for supported chains and tokens
-        await this.createCustodialWallets(user.id, prisma);
-
-        return { user, apiKey };
-      });
+      // Create wallets in a separate transaction
+      await this.prisma.$transaction(
+        async (prisma) => {
+          // Create multi-chain wallets
+          await this.multiChainWalletService.createUserWallets(newUser.user.id);
+          // Create custodial wallets
+          await this.createCustodialWallets(newUser.user.id, prisma);
+        },
+        {
+          timeout: 30000, // Increased to 30 seconds
+          maxWait: 10000,
+        }
+      );
 
       // Send verification email
       await this.sendVerificationEmail(registerDto.email, otp);
@@ -362,8 +374,7 @@ export class AuthService implements IAuthService {
   }
 
   private async createCustodialWallets(userId: string, prisma: any) {
-    const supportedTokens: Record<string, TokenDetails> =
-      SUPPORTED_CRYPTOCURRENCIES;
+    const supportedTokens: Record<string, TokenDetails> = SUPPORTED_CRYPTOCURRENCIES;
     const supportedNetworks: Record<string, NetworkConfig> = SUPPORTED_NETWORKS;
 
     for (const [networkKey, network] of Object.entries(supportedNetworks)) {
@@ -373,15 +384,23 @@ export class AuthService implements IAuthService {
         const tokenDetails = supportedTokens[token];
         if (!tokenDetails) continue;
 
-        await prisma.custodialWallet.create({
-          data: {
+        await prisma.custodialWallet.upsert({
+          where: {
+            userId_token_chainId: {
+              userId,
+              token,
+              chainId: network.chainId || 1,
+            }
+          },
+          update: {}, // No updates if it exists
+          create: {
             userId,
             token,
-            chainId: network.chainId || 1, // Default to 1 if not specified
+            chainId: network.chainId || 1,
             balance: '0',
             status: 'ACTIVE',
             network: network.name || networkKey,
-            tokenDecimals: tokenDetails.decimals || 18, // Default to 18 if not specified
+            tokenDecimals: tokenDetails.decimals || 18,
           },
         });
       }

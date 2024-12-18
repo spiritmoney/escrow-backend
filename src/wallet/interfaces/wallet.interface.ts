@@ -19,4 +19,12 @@ export interface IWalletService {
     encryptedKey: string,
     iv: string
   ): Promise<string>;
+}
+
+export interface IWalletResponse {
+  address: string;
+  encryptedPrivateKey: string;
+  iv: string;
+  network: string;
+  chainId: number;
 } 

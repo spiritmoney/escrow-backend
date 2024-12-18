@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { ethers } from 'ethers';
 import { IChainWallet, IChainWalletService } from '../interfaces/chain-wallet.interface';
@@ -16,6 +16,7 @@ export const ERC20_ABI = [
 @Injectable()
 export class EthereumWalletService implements IChainWalletService {
   protected provider: ethers.JsonRpcProvider;
+  protected logger: Logger;
 
   constructor(
     protected configService: ConfigService,
@@ -132,5 +133,15 @@ export class EthereumWalletService implements IChainWalletService {
 
   async getNonce(address: string): Promise<number> {
     return await this.provider.getTransactionCount(address);
+  }
+
+  async decryptPrivateKey(encryptedPrivateKey: string, iv: string): Promise<string | null> {
+    try {
+      const wallet = ethers.Wallet.fromEncryptedJsonSync(encryptedPrivateKey, iv);
+      return wallet.privateKey;
+    } catch (error) {
+      this.logger.error('Error decrypting private key:', error);
+      return null;
+    }
   }
 } 

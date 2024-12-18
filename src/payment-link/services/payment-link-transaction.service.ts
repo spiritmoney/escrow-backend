@@ -1,4 +1,9 @@
-import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { BlockchainService } from '../../services/blockchain/blockchain.service';
 import { ConversionService } from '../../balance/services/conversion.service';
@@ -7,12 +12,21 @@ import { ethers } from 'ethers';
 import { TradeProtectionService } from '../../payment-link/services/trade-protection.service';
 import { EscrowMonitorService } from '../../payment-link/services/escrow-monitor.service';
 import { NodemailerService } from '../../services/nodemailer/NodemailerService';
-import { PaymentLinkType, TransactionType } from '../../payment-link/dto/payment-link.dto';
+import {
+  InitiateTransactionDto,
+  PaymentLinkType,
+  TransactionType,
+  PaymentMethodType,
+} from '../../payment-link/dto/payment-link.dto';
 import { Prisma } from '@prisma/client';
 import { systemResponses } from '../../contracts/system.responses';
 import { BridgeService } from '../../services/bridge/bridge.service';
 import { ConfigService } from '@nestjs/config';
 import BigNumber from 'bignumber.js';
+import { EthereumWalletService } from '../../wallet/services/ethereum-wallet.service';
+import { StripeService } from '../../services/stripe/stripe.service';
+import { IWalletResponse } from '../../wallet/interfaces/wallet.interface';
+import { WalletEncryptionService } from '../../wallet/services/wallet-encryption.service';
 
 // Add this interface with the other interfaces at the top of the file
 interface CryptocurrencyDetails {
@@ -60,13 +74,21 @@ interface TransactionResponse {
   amount: number;
   currency: string;
   status: string;
-  paymentMethod: string | null;
-  escrowAddress: string | null;
-  expiresAt: Date | null;
-  createdAt: Date;
-  customer?: {
+  customer: {
     email: string;
-    name: string | null;
+    name: string;
+  };
+  createdAt: Date;
+  paymentMethod: string;
+  expiresAt: Date;
+  paymentDetails?: any;
+  escrowAddress?: string;
+  data?: {
+    dealStage?: string;
+    requiredDocuments?: string[];
+    nextSteps?: string[];
+    sandboxPayment?: boolean;
+    paymentMethodDetails?: any;
   };
 }
 
@@ -85,6 +107,21 @@ const SUPPORTED_NETWORKS = {
   // Add other networks...
 };
 
+type PaymentLinkInclude = Prisma.PaymentLinkInclude & {
+  user: {
+    include: Prisma.UserInclude & {
+      stripeAccount:
+        | true
+        | {
+            select: {
+              id: boolean;
+              [key: string]: boolean;
+            };
+          };
+    };
+  };
+};
+
 @Injectable()
 export class PaymentLinkTransactionService {
   private readonly logger = new Logger(PaymentLinkTransactionService.name);
@@ -93,72 +130,167 @@ export class PaymentLinkTransactionService {
     private prisma: PrismaService,
     private blockchainService: BlockchainService,
     private conversionService: ConversionService,
+    private ethereumWalletService: EthereumWalletService,
     private walletService: MultiChainWalletService,
+    private walletEncryptionService: WalletEncryptionService,
     private tradeProtection: TradeProtectionService,
     private escrowMonitor: EscrowMonitorService,
     private emailService: NodemailerService,
     private bridgeService: BridgeService,
-    private configService: ConfigService
+    private configService: ConfigService,
+    private stripeService: StripeService,
   ) {}
 
   async initiateTransaction(
     paymentLinkId: string,
-    userId: string,
-    amount: number,
-    currency: string,
-    customerEmail: string,
-    customerName: string,
-    buyerWalletAddress?: string
+    dto: InitiateTransactionDto,
   ): Promise<TransactionResponse> {
-    const paymentLink = await this.prisma.paymentLink.findUnique({
-      where: { id: paymentLinkId },
-      include: {
-        createdBy: {
-          include: { wallet: true },
+    try {
+      // Validate payment link exists and is active
+      const paymentLink = await this.prisma.paymentLink.findFirst({
+        where: {
+          id: paymentLinkId,
+          status: 'ACTIVE',
         },
-        paymentLinkMethods: true,
-      },
-    });
+        include: {
+          user: true,
+          paymentLinkMethods: true,
+        },
+      });
 
-    if (!paymentLink) {
-      throw new BadRequestException(systemResponses.EN.PAYMENT_LINK_NOT_FOUND);
+      if (!paymentLink) {
+        throw new NotFoundException(systemResponses.EN.PAYMENT_LINK_NOT_FOUND);
+      }
+
+      // Validate payment method is supported
+      const supportedMethod = paymentLink.paymentLinkMethods.find(
+        (m) => m.type === dto.paymentMethod,
+      );
+
+      if (!supportedMethod) {
+        throw new BadRequestException(
+          'Selected payment method is not supported for this payment link',
+        );
+      }
+
+      // Handle cryptocurrency payment
+      if (dto.paymentMethod === PaymentMethodType.CRYPTOCURRENCY) {
+        if (!dto.paymentDetails?.network || !dto.paymentDetails?.tokenSymbol) {
+          throw new BadRequestException('Invalid cryptocurrency payment details');
+        }
+        
+        // Create transaction record
+        const transaction = await this.prisma.transaction.create({
+          data: {
+            amount: dto.amount,
+            currency: dto.currency,
+            status: 'PENDING',
+            type: 'CRYPTOCURRENCY',
+            paymentMethod: PaymentMethodType.CRYPTOCURRENCY,
+            customerEmail: dto.customerEmail,
+            customerName: dto.customerName,
+            paymentDetails: {
+              network: dto.paymentDetails.network,
+              tokenSymbol: dto.paymentDetails.tokenSymbol,
+              buyerWalletAddress: dto.buyerWalletAddress,
+            } as Prisma.InputJsonValue,
+            metadata: {
+              initiatedAt: new Date().toISOString(),
+              expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+            } as Prisma.InputJsonValue,
+            paymentLink: {
+              connect: { id: paymentLinkId }
+            },
+            customer: {
+              connectOrCreate: {
+                where: { email: dto.customerEmail },
+                create: {
+                  email: dto.customerEmail,
+                  firstName: dto.customerName,
+                  lastName: '',
+                  password: '',
+                  country: '',
+                  organisation: '',
+                  name: dto.customerName,
+                }
+              }
+            }
+          },
+          include: {
+            customer: true,
+            sender: true,
+            recipient: true,
+            paymentLink: true
+          }
+        });
+
+        return {
+          id: transaction.id,
+          amount: transaction.amount,
+          currency: transaction.currency,
+          status: transaction.status,
+          customer: {
+            email: transaction.customerEmail || '',
+            name: transaction.customerName || ''
+          },
+          createdAt: transaction.createdAt,
+          paymentMethod: transaction.paymentMethod || '',
+          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+          paymentDetails: {
+            network: dto.paymentDetails.network,
+            tokenSymbol: dto.paymentDetails.tokenSymbol,
+            buyerWalletAddress: dto.buyerWalletAddress
+          }
+        };
+      }
+
+      // Handle other payment methods...
+    } catch (error) {
+      this.logger.error('Error initiating transaction:', error);
+      throw new BadRequestException(
+        error.message || systemResponses.EN.TRANSACTION_INITIATION_FAILED,
+      );
+    }
+  }
+
+  private validateBankTransferDetails(details: any) {
+    if (!details) {
+      throw new BadRequestException(
+        'Payment details are required for bank transfer',
+      );
     }
 
-    // Create or get customer record
-    const customer = await this.prisma.customer.upsert({
-      where: { email: customerEmail },
-      update: { name: customerName },
-      create: {
-        email: customerEmail,
-        name: customerName,
-      },
-    });
+    const requiredFields = [
+      'bankName',
+      'accountNumber',
+      'routingNumber',
+      'accountType',
+      'accountHolderName',
+    ];
+    const missingFields = requiredFields.filter((field) => !details[field]);
 
-    // Handle different transaction types
-    switch (paymentLink.transactionType) {
-      case TransactionType.CRYPTOCURRENCY:
-        return this.handleCryptoTransaction(
-          paymentLink,
-          userId,
-          amount,
-          customerEmail,
-          customerName,
-          buyerWalletAddress
-        );
-
-      case TransactionType.SERVICES:
-        return this.handleServiceTransaction(
-          paymentLink,
-          userId,
-          amount,
-          currency,
-          customer,
-          buyerWalletAddress
-        );
-
-      default:
-        throw new BadRequestException('Unsupported transaction type');
+    if (missingFields.length > 0) {
+      throw new BadRequestException(
+        `Missing required bank transfer details: ${missingFields.join(', ')}`,
+      );
     }
+  }
+
+  private generateBankTransferInstructions(
+    paymentLink: any,
+    dto: InitiateTransactionDto,
+  ) {
+    return {
+      steps: [
+        'Initiate a bank transfer from your account',
+        'Use the provided reference number in the transfer description',
+        'Upload proof of transfer when completed',
+        'Wait for confirmation from the seller',
+      ],
+      reference: `REF-${dto.customerName.substring(0, 3).toUpperCase()}-${Date.now()}`,
+      timeLimit: '24 hours',
+      supportEmail: process.env.SUPPORT_EMAIL || 'support@example.com',
+    };
   }
 
   private async handleCryptoTransaction(
@@ -167,15 +299,19 @@ export class PaymentLinkTransactionService {
     amount: number,
     customerEmail: string,
     customerName: string,
-    buyerWalletAddress: string
+    buyerWalletAddress: string,
   ): Promise<TransactionResponse> {
     try {
       if (!buyerWalletAddress) {
-        throw new BadRequestException(systemResponses.EN.INVALID_WALLET_ADDRESS);
+        throw new BadRequestException(
+          systemResponses.EN.INVALID_WALLET_ADDRESS,
+        );
       }
 
       if (!this.blockchainService.isValidAddress(buyerWalletAddress)) {
-        throw new BadRequestException(systemResponses.EN.INVALID_WALLET_ADDRESS);
+        throw new BadRequestException(
+          systemResponses.EN.INVALID_WALLET_ADDRESS,
+        );
       }
 
       // Create or get customer record first
@@ -189,10 +325,17 @@ export class PaymentLinkTransactionService {
       });
 
       const cryptoDetails = paymentLink.details as CryptocurrencyDetails;
-      
+
       // Validate the token and network
-      if (!this.isValidTokenForNetwork(cryptoDetails.tokenSymbol, cryptoDetails.chainId)) {
-        throw new BadRequestException(systemResponses.EN.UNSUPPORTED_TOKEN_NETWORK);
+      if (
+        !this.isValidTokenForNetwork(
+          cryptoDetails.tokenSymbol,
+          cryptoDetails.chainId,
+        )
+      ) {
+        throw new BadRequestException(
+          systemResponses.EN.UNSUPPORTED_TOKEN_NETWORK,
+        );
       }
 
       // For selling crypto, freeze seller's balance
@@ -201,7 +344,7 @@ export class PaymentLinkTransactionService {
           paymentLink.userId,
           cryptoDetails.tokenAddress,
           cryptoDetails.chainId,
-          amount
+          amount,
         );
       }
 
@@ -211,7 +354,7 @@ export class PaymentLinkTransactionService {
         paymentLink.user.wallet.address,
         BigInt(amount),
         cryptoDetails.tokenAddress,
-        cryptoDetails.chainId
+        cryptoDetails.chainId,
       );
 
       // Create transaction record
@@ -221,7 +364,7 @@ export class PaymentLinkTransactionService {
         amount,
         cryptoDetails,
         escrowAddress,
-        buyerWalletAddress
+        buyerWalletAddress,
       );
 
       // Send notifications
@@ -230,7 +373,9 @@ export class PaymentLinkTransactionService {
       return this.formatTransactionResponse(transaction);
     } catch (error) {
       this.logger.error('Error handling crypto transaction:', error);
-      throw new BadRequestException(error.message || systemResponses.EN.TRANSACTION_FAILED);
+      throw new BadRequestException(
+        error.message || systemResponses.EN.TRANSACTION_FAILED,
+      );
     }
   }
 
@@ -240,12 +385,14 @@ export class PaymentLinkTransactionService {
     amount: number,
     currency: string,
     customer: any,
-    buyerWalletAddress?: string
+    buyerWalletAddress?: string,
   ): Promise<TransactionResponse> {
     try {
       // Validate payment method
       if (!paymentLink.paymentLinkMethods?.length) {
-        throw new BadRequestException(systemResponses.EN.PAYMENT_METHOD_REQUIRED);
+        throw new BadRequestException(
+          systemResponses.EN.PAYMENT_METHOD_REQUIRED,
+        );
       }
 
       // Create transaction record
@@ -262,14 +409,14 @@ export class PaymentLinkTransactionService {
           data: {
             paymentLinkId: paymentLink.id,
             serviceDetails: paymentLink.details,
-            verificationMethod: paymentLink.verificationMethod
-          }
+            verificationMethod: paymentLink.verificationMethod,
+          },
         },
         include: {
           sender: true,
           recipient: true,
-          customer: true
-        }
+          customer: true,
+        },
       });
 
       // Send notifications
@@ -279,14 +426,17 @@ export class PaymentLinkTransactionService {
     } catch (error) {
       this.logger.error('Error handling service transaction:', error);
       throw new BadRequestException(
-        error.message || systemResponses.EN.TRANSACTION_FAILED
+        error.message || systemResponses.EN.TRANSACTION_FAILED,
       );
     }
   }
 
-  private isValidTokenForNetwork(tokenSymbol: string, chainId: number): boolean {
+  private isValidTokenForNetwork(
+    tokenSymbol: string,
+    chainId: number,
+  ): boolean {
     const networkConfig = Object.values(SUPPORTED_NETWORKS).find(
-      (network: any) => network.chainId === chainId
+      (network: any) => network.chainId === chainId,
     );
 
     if (!networkConfig) return false;
@@ -299,7 +449,7 @@ export class PaymentLinkTransactionService {
     amount: number,
     cryptoDetails: CryptocurrencyDetails,
     escrowAddress: string,
-    buyerWalletAddress: string
+    buyerWalletAddress: string,
   ): Promise<any> {
     return this.prisma.transaction.create({
       data: {
@@ -316,13 +466,13 @@ export class PaymentLinkTransactionService {
         paymentMethod: 'CRYPTO',
         data: JSON.stringify({
           paymentLinkId: paymentLink.id,
-          tokenDetails: cryptoDetails
-        })
+          tokenDetails: cryptoDetails,
+        }),
       },
       include: {
         sender: true,
-        customer: true
-      }
+        customer: true,
+      },
     });
   }
 
@@ -336,14 +486,14 @@ export class PaymentLinkTransactionService {
       createdAt: transaction.createdAt,
       escrowAddress: transaction.escrowAddress,
       paymentMethod: transaction.paymentMethod,
-      expiresAt: transaction.expiresAt
+      expiresAt: transaction.expiresAt,
     };
   }
 
   private async sendTransactionStatusEmails(
     transaction: TransactionWithRelations,
     status: string,
-    additionalDetails?: any
+    additionalDetails?: any,
   ) {
     const emailPromises = [];
 
@@ -353,8 +503,13 @@ export class PaymentLinkTransactionService {
         this.emailService.sendEmail({
           to: [transaction.sender.email],
           subject: `Transaction ${status} - ID: ${transaction.id}`,
-          html: this.getEmailTemplate('BUYER', transaction, status, additionalDetails)
-        })
+          html: this.getEmailTemplate(
+            'BUYER',
+            transaction,
+            status,
+            additionalDetails,
+          ),
+        }),
       );
     }
 
@@ -364,21 +519,33 @@ export class PaymentLinkTransactionService {
         this.emailService.sendEmail({
           to: [transaction.recipient.email],
           subject: `Transaction ${status} - ID: ${transaction.id}`,
-          html: this.getEmailTemplate('SELLER', transaction, status, additionalDetails)
-        })
+          html: this.getEmailTemplate(
+            'SELLER',
+            transaction,
+            status,
+            additionalDetails,
+          ),
+        }),
       );
     }
 
     // Send to customer if different from sender/recipient
-    if (transaction.customer?.email && 
-        transaction.customer.email !== transaction.sender?.email && 
-        transaction.customer.email !== transaction.recipient?.email) {
+    if (
+      transaction.customer?.email &&
+      transaction.customer.email !== transaction.sender?.email &&
+      transaction.customer.email !== transaction.recipient?.email
+    ) {
       emailPromises.push(
         this.emailService.sendEmail({
           to: [transaction.customer.email],
           subject: `Transaction ${status} - ID: ${transaction.id}`,
-          html: this.getEmailTemplate('CUSTOMER', transaction, status, additionalDetails)
-        })
+          html: this.getEmailTemplate(
+            'CUSTOMER',
+            transaction,
+            status,
+            additionalDetails,
+          ),
+        }),
       );
     }
 
@@ -389,7 +556,7 @@ export class PaymentLinkTransactionService {
     userId: string,
     tokenAddress: string,
     chainId: number,
-    amount: number
+    amount: number,
   ): Promise<void> {
     // Create or update frozen balance record
     await this.prisma.cryptoBalanceReservation.upsert({
@@ -418,13 +585,13 @@ export class PaymentLinkTransactionService {
     amount: number,
     tokenAddress: string,
     chainId: number,
-    targetTokenAddress?: string
+    targetTokenAddress?: string,
   ): Promise<string> {
     // Use blockchain bridge to convert crypto to SKRO
     const bridgeRate = await this.blockchainService.getBridgeConversionRate(
       tokenAddress,
       chainId,
-      targetTokenAddress || tokenAddress
+      targetTokenAddress || tokenAddress,
     );
 
     // Use BigNumber for safe calculations
@@ -442,43 +609,47 @@ export class PaymentLinkTransactionService {
     amount: number,
     currency: string,
     skroAmount: bigint,
-    escrowAddress: string
+    escrowAddress: string,
   ) {
     return this.prisma.transaction.create({
       data: {
-        sender: paymentLink.type === PaymentLinkType.BUYING ? 
-          { connect: { id: paymentLink.userId } } :
-          undefined,
-        recipient: paymentLink.type === PaymentLinkType.SELLING ?
-          { connect: { id: paymentLink.userId } } :
-          undefined,
-        customer: { connect: { id: customer.id } },
         amount: Number(ethers.formatEther(skroAmount)),
         currency: 'SKRO',
-        originalAmount: amount,
-        originalCurrency: currency,
         type: TransactionType.SERVICES,
         status: 'PENDING_REVIEW',
         escrowAddress,
         paymentMethod: 'CRYPTO',
-        data: {
+        customerEmail: customer.email,
+        customerName: customer.name,
+        paymentDetails: {
           serviceProof: paymentLink.details.serviceProof,
-          paymentLinkId: paymentLink.id
         },
-        verificationState: 'PROOF_SUBMITTED'
+        metadata: {
+          paymentLinkId: paymentLink.id,
+        },
+        customer: { connect: { id: customer.id } },
+        paymentLink: { connect: { id: paymentLink.id } },
+        sender:
+          paymentLink.type === PaymentLinkType.BUYING
+            ? { connect: { id: paymentLink.userId } }
+            : undefined,
+        recipient:
+          paymentLink.type === PaymentLinkType.SELLING
+            ? { connect: { id: paymentLink.userId } }
+            : undefined,
       },
       include: {
         sender: true,
         recipient: true,
-        customer: true
-      }
+        customer: true,
+      },
     });
   }
 
   private async createServiceEscrow(
     paymentLink: any,
     userId: string,
-    skroAmount: bigint
+    skroAmount: bigint,
   ): Promise<string> {
     try {
       // Get seller's wallet address from the payment link creator
@@ -488,11 +659,12 @@ export class PaymentLinkTransactionService {
       }
 
       // Create escrow contract - no need to convert amount since it's already bigint
-      const escrowAddress = await this.blockchainService.createEscrowForPaymentLink(
-        sellerWalletAddress,
-        userId,
-        skroAmount
-      );
+      const escrowAddress =
+        await this.blockchainService.createEscrowForPaymentLink(
+          sellerWalletAddress,
+          userId,
+          skroAmount,
+        );
 
       return escrowAddress;
     } catch (error) {
@@ -501,7 +673,11 @@ export class PaymentLinkTransactionService {
     }
   }
 
-  async confirmDelivery(transactionId: string, userId: string, isConfirmed: boolean) {
+  async confirmDelivery(
+    transactionId: string,
+    userId: string,
+    isConfirmed: boolean,
+  ) {
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
       include: { sender: true, recipient: true },
@@ -519,11 +695,15 @@ export class PaymentLinkTransactionService {
     }
   }
 
-  private async confirmCryptoDelivery(transaction: any, userId: string, isConfirmed: boolean) {
+  private async confirmCryptoDelivery(
+    transaction: any,
+    userId: string,
+    isConfirmed: boolean,
+  ) {
     if (isConfirmed) {
       await this.blockchainService.releaseEscrow(
         transaction.escrowAddress,
-        process.env.ARBITER_PRIVATE_KEY
+        process.env.ARBITER_PRIVATE_KEY,
       );
 
       await this.prisma.transaction.update({
@@ -535,10 +715,14 @@ export class PaymentLinkTransactionService {
     return { status: systemResponses.EN.TRANSACTION_COMPLETED };
   }
 
-  private async confirmGoodsDelivery(transaction: any, userId: string, isConfirmed: boolean) {
+  private async confirmGoodsDelivery(
+    transaction: any,
+    userId: string,
+    isConfirmed: boolean,
+  ) {
     // For goods, we need both parties to confirm
     const isBuyer = transaction.senderId === userId;
-    const updateData = isBuyer 
+    const updateData = isBuyer
       ? { buyerConfirmed: isConfirmed }
       : { sellerConfirmed: isConfirmed };
 
@@ -553,13 +737,13 @@ export class PaymentLinkTransactionService {
       include: {
         sender: true,
         recipient: true,
-      }
+      },
     });
 
     // Send confirmation emails based on who confirmed
     const recipientEmail = updated.recipient?.email;
     const senderEmail = updated.sender?.email;
-    
+
     if (recipientEmail && senderEmail) {
       await this.emailService.sendEmail({
         to: [isBuyer ? recipientEmail : senderEmail],
@@ -568,10 +752,11 @@ export class PaymentLinkTransactionService {
           <h2>Delivery Status Update</h2>
           <p>Transaction ID: ${transaction.id}</p>
           <p>${isBuyer ? 'Buyer' : 'Seller'} has confirmed delivery.</p>
-          ${updated.buyerConfirmed && updated.sellerConfirmed ? 
-            '<p>Both parties have confirmed. Transaction will be completed.</p>' : 
-            '<p>Waiting for other party confirmation.</p>'
-          }`
+          ${
+            updated.buyerConfirmed && updated.sellerConfirmed
+              ? '<p>Both parties have confirmed. Transaction will be completed.</p>'
+              : '<p>Waiting for other party confirmation.</p>'
+          }`,
       });
     }
 
@@ -586,7 +771,7 @@ export class PaymentLinkTransactionService {
             <p>Transaction ID: ${transaction.id}</p>
             <p>Both parties have confirmed delivery.</p>
             <p>Funds have been released from escrow.</p>
-          `
+          `,
         }),
         this.emailService.sendEmail({
           to: [transaction.recipient.email],
@@ -596,8 +781,8 @@ export class PaymentLinkTransactionService {
             <p>Transaction ID: ${transaction.id}</p>
             <p>Both parties have confirmed delivery.</p>
             <p>Funds have been released from escrow.</p>
-          `
-        })
+          `,
+        }),
       ]);
     }
 
@@ -655,8 +840,8 @@ export class PaymentLinkTransactionService {
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
       include: {
-        recipient: true
-      }
+        recipient: true,
+      },
     });
 
     if (!transaction || transaction.senderId !== buyerId) {
@@ -673,7 +858,7 @@ export class PaymentLinkTransactionService {
       await this.emailService.sendEmail({
         to: [transaction.recipient.email],
         subject: 'Payment Confirmed',
-        html: `Buyer has confirmed payment for transaction ${transactionId}. Please verify and release escrow.`
+        html: `Buyer has confirmed payment for transaction ${transactionId}. Please verify and release escrow.`,
       });
     }
 
@@ -681,17 +866,19 @@ export class PaymentLinkTransactionService {
   }
 
   async addPaymentDetails(
-    transactionId: string, 
+    transactionId: string,
     userId: string,
     paymentMethod: string,
-    details: any
+    details: any,
   ) {
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
     });
 
     if (!transaction || transaction.recipientId !== userId) {
-      throw new BadRequestException(systemResponses.EN.TRANSACTION_UNAUTHORIZED);
+      throw new BadRequestException(
+        systemResponses.EN.TRANSACTION_UNAUTHORIZED,
+      );
     }
 
     if (!transaction.paymentConfirmed) {
@@ -719,16 +906,15 @@ export class PaymentLinkTransactionService {
   }
 
   async validatePaymentLink(linkId: string): Promise<any> {
-    // Extract the clean ID from the URL if needed
     const cleanId = linkId.replace('link-', '');
-    
+
     const paymentLink = await this.prisma.paymentLink.findUnique({
       where: { id: cleanId },
       include: {
-        createdBy: {
-          include: { wallet: true }
-        }
-      }
+        user: {
+          include: { wallets: true },
+        },
+      },
     });
 
     if (!paymentLink) {
@@ -742,12 +928,13 @@ export class PaymentLinkTransactionService {
     return paymentLink;
   }
 
-  async getTransactionDetails(transactionId: string, userId: string) {
+  async getTransactionDetails(id: string) {
     const transaction = await this.prisma.transaction.findUnique({
-      where: { id: transactionId },
+      where: { id },
       include: {
         sender: true,
         recipient: true,
+        customer: true,
       },
     });
 
@@ -755,24 +942,37 @@ export class PaymentLinkTransactionService {
       throw new BadRequestException('Transaction not found');
     }
 
+    // Get the payment link separately if needed
+    const paymentLink = await this.prisma.paymentLink.findFirst({
+      where: {
+        transactions: {
+          some: {
+            id: transaction.id,
+          },
+        },
+      },
+    });
+
     // Convert SKRO amount back to original currency for display
     const originalAmount = await this.conversionService.convertAmount(
       transaction.amount,
       transaction.currency,
-      'USD'
+      'USD',
     );
 
     return {
       ...transaction,
+      paymentLink,
       skroAmount: transaction.amount,
       displayAmount: originalAmount,
       displayCurrency: transaction.originalCurrency,
       rates: {
-        [transaction.originalCurrency]: await this.conversionService.getConversionRate(
-          'SKRO',
-          transaction.originalCurrency
-        )
-      }
+        [transaction.originalCurrency]:
+          await this.conversionService.getConversionRate(
+            'SKRO',
+            transaction.originalCurrency,
+          ),
+      },
     };
   }
 
@@ -780,14 +980,17 @@ export class PaymentLinkTransactionService {
     role: 'BUYER' | 'SELLER' | 'CUSTOMER',
     transaction: any,
     status: string,
-    additionalDetails?: any
+    additionalDetails?: any,
   ): string {
     const baseTemplate = `
       <h2>Transaction Update</h2>
       <p>Transaction ID: ${transaction.id}</p>
       <p>Amount: ${transaction.amount} ${transaction.currency}</p>
-      ${status === 'INITIATED' && role === 'CUSTOMER' ? 
-        `<p>Thank you for your purchase! We'll keep you updated on the status.</p>` : ''}
+      ${
+        status === 'INITIATED' && role === 'CUSTOMER'
+          ? `<p>Thank you for your purchase! We'll keep you updated on the status.</p>`
+          : ''
+      }
       <p>Status: ${status}</p>
     `;
 
@@ -821,7 +1024,10 @@ export class PaymentLinkTransactionService {
     }
   }
 
-  private getBuyerStatusSpecificContent(status: string, additionalDetails?: any): string {
+  private getBuyerStatusSpecificContent(
+    status: string,
+    additionalDetails?: any,
+  ): string {
     switch (status) {
       case 'INITIATED':
         return '<p>Please complete the payment to proceed with your purchase.</p>';
@@ -836,7 +1042,10 @@ export class PaymentLinkTransactionService {
     }
   }
 
-  private getSellerStatusSpecificContent(status: string, additionalDetails?: any): string {
+  private getSellerStatusSpecificContent(
+    status: string,
+    additionalDetails?: any,
+  ): string {
     switch (status) {
       case 'INITIATED':
         return '<p>A new transaction has been initiated. Waiting for buyer payment.</p>';
@@ -857,12 +1066,14 @@ export class PaymentLinkTransactionService {
       include: {
         sender: true,
         recipient: true,
-        customer: true
-      }
+        customer: true,
+      },
     });
 
     if (!transaction || transaction.recipientId !== sellerId) {
-      throw new BadRequestException(systemResponses.EN.TRANSACTION_UNAUTHORIZED);
+      throw new BadRequestException(
+        systemResponses.EN.TRANSACTION_UNAUTHORIZED,
+      );
     }
 
     if (!transaction.paymentConfirmed) {
@@ -873,16 +1084,16 @@ export class PaymentLinkTransactionService {
       // Release the crypto from escrow to buyer
       await this.blockchainService.releaseEscrow(
         transaction.escrowAddress,
-        process.env.ARBITER_PRIVATE_KEY // Arbiter releases the funds
+        process.env.ARBITER_PRIVATE_KEY, // Arbiter releases the funds
       );
 
       // Update transaction status
       await this.prisma.transaction.update({
         where: { id: transactionId },
-        data: { 
+        data: {
           status: 'COMPLETED',
-          sellerConfirmed: true
-        }
+          sellerConfirmed: true,
+        },
       });
 
       // Notify both parties
@@ -895,7 +1106,7 @@ export class PaymentLinkTransactionService {
             <p>The cryptocurrency has been released to your wallet.</p>
             <p>Transaction ID: ${transaction.id}</p>
             <p>Amount: ${transaction.amount} SKRO</p>
-          `
+          `,
         }),
         this.emailService.sendEmail({
           to: [transaction.recipient.email],
@@ -905,8 +1116,8 @@ export class PaymentLinkTransactionService {
             <p>The cryptocurrency has been released to the buyer.</p>
             <p>Transaction ID: ${transaction.id}</p>
             <p>Amount: ${transaction.amount} SKRO</p>
-          `
-        })
+          `,
+        }),
       ]);
 
       return { status: 'completed' };
@@ -920,7 +1131,7 @@ export class PaymentLinkTransactionService {
     userId: string,
     tokenAddress: string,
     chainId: number,
-    amount: number
+    amount: number,
   ): Promise<void> {
     const reservation = await this.prisma.cryptoBalanceReservation.findUnique({
       where: {
@@ -938,15 +1149,15 @@ export class PaymentLinkTransactionService {
 
     if (reservation.amount < amount) {
       throw new BadRequestException(
-        'Requested amount exceeds seller\'s reserved balance'
+        "Requested amount exceeds seller's reserved balance",
       );
     }
   }
 
   async handlePaymentSuccess(
     transaction: any,
-    paymentLink: any
-  ): Promise<{ 
+    paymentLink: any,
+  ): Promise<{
     status: string;
     redirectUrl?: string;
     proofDetails?: any;
@@ -958,24 +1169,26 @@ export class PaymentLinkTransactionService {
         data: {
           status: 'PENDING_VERIFICATION',
           paymentConfirmed: true,
-        }
+        },
       });
 
       // For service payments, return proof verification URL
       if (paymentLink.transactionType === TransactionType.SERVICES) {
         const verificationUrl = `${this.configService.get('FRONTEND_URL')}/verify/${transaction.id}`;
-        
+
         return {
           status: 'PAYMENT_CONFIRMED',
           redirectUrl: verificationUrl,
-          proofDetails: paymentLink.details.serviceProof
+          proofDetails: paymentLink.details.serviceProof,
         };
       }
 
       return { status: 'PAYMENT_CONFIRMED' };
     } catch (error) {
       this.logger.error('Error handling payment success:', error);
-      throw new BadRequestException(systemResponses.EN.TRANSACTION_UPDATE_FAILED);
+      throw new BadRequestException(
+        systemResponses.EN.TRANSACTION_UPDATE_FAILED,
+      );
     }
   }
 
@@ -985,19 +1198,19 @@ export class PaymentLinkTransactionService {
     verificationData: {
       isAccepted: boolean;
       feedback?: string;
-    }
+    },
   ): Promise<any> {
     const transaction = await this.prisma.transaction.findUnique({
       where: { id: transactionId },
       include: {
         customer: true,
         sender: {
-          include: { wallet: true }
+          include: { wallets: true },
         },
         recipient: {
-          include: { wallet: true }
-        }
-      }
+          include: { wallets: true },
+        },
+      },
     });
 
     if (!transaction) {
@@ -1011,11 +1224,12 @@ export class PaymentLinkTransactionService {
     if (verificationData.isAccepted) {
       // Release escrow immediately if accepted
       await this.releaseEscrow(transaction);
-      
+
       // Parse existing data if it exists
-      const existingData = transaction.data ? 
-        JSON.parse(transaction.data as string) : {};
-      
+      const existingData = transaction.data
+        ? JSON.parse(transaction.data as string)
+        : {};
+
       // Update transaction with verification data
       await this.prisma.transaction.update({
         where: { id: transactionId },
@@ -1027,16 +1241,19 @@ export class PaymentLinkTransactionService {
             verification: {
               verifiedAt: new Date(),
               feedback: verificationData.feedback,
-              verifiedBy: userId
-            }
-          })
-        }
+              verifiedBy: userId,
+            },
+          }),
+        },
       });
 
       // Send notifications
       await this.sendVerificationNotifications(transaction, true);
 
-      return { status: 'COMPLETED', message: 'Service verified and payment released' };
+      return {
+        status: 'COMPLETED',
+        message: 'Service verified and payment released',
+      };
     } else {
       // Initiate dispute if service is rejected
       await this.initiateDispute(transaction, verificationData.feedback);
@@ -1044,37 +1261,40 @@ export class PaymentLinkTransactionService {
     }
   }
 
-  private async sendVerificationNotifications(transaction: any, accepted: boolean) {
-    const subject = accepted ? 
-      'Service Verified - Payment Released' : 
-      'Service Verification Failed - Dispute Initiated';
+  private async sendVerificationNotifications(
+    transaction: any,
+    accepted: boolean,
+  ) {
+    const subject = accepted
+      ? 'Service Verified - Payment Released'
+      : 'Service Verification Failed - Dispute Initiated';
 
-    const buyerMessage = accepted ?
-      'You have verified the service. Payment has been released to the seller.' :
-      'You have reported an issue with the service. A dispute has been initiated.';
+    const buyerMessage = accepted
+      ? 'You have verified the service. Payment has been released to the seller.'
+      : 'You have reported an issue with the service. A dispute has been initiated.';
 
-    const sellerMessage = accepted ?
-      'The buyer has verified your service. Payment has been released.' :
-      'The buyer has reported an issue with your service. A dispute has been initiated.';
+    const sellerMessage = accepted
+      ? 'The buyer has verified your service. Payment has been released.'
+      : 'The buyer has reported an issue with your service. A dispute has been initiated.';
 
     await Promise.all([
       this.emailService.sendEmail({
         to: [transaction.customer.email],
         subject,
-        html: `<h2>${subject}</h2><p>${buyerMessage}</p>`
+        html: `<h2>${subject}</h2><p>${buyerMessage}</p>`,
       }),
       this.emailService.sendEmail({
-        to: [transaction.paymentLink.createdBy.email],
+        to: [transaction.paymentLink.user.email],
         subject,
-        html: `<h2>${subject}</h2><p>${sellerMessage}</p>`
-      })
+        html: `<h2>${subject}</h2><p>${sellerMessage}</p>`,
+      }),
     ]);
   }
 
   private async releaseEscrow(transaction: any) {
     return this.blockchainService.releaseEscrow(
       transaction.escrowAddress,
-      transaction.chainId
+      transaction.chainId,
     );
   }
 
@@ -1085,21 +1305,21 @@ export class PaymentLinkTransactionService {
         reason,
         status: 'OPENED',
         evidence: [],
-        initiatorId: transaction.customerId
-      }
+        initiatorId: transaction.customerId,
+      },
     });
   }
 
   private async convertAmount(
     amount: number,
     fromCurrency: string,
-    toCurrency: string
+    toCurrency: string,
   ): Promise<number> {
     try {
       return await this.conversionService.convertCurrency(
         amount,
         fromCurrency,
-        toCurrency
+        toCurrency,
       );
     } catch (error) {
       this.logger.error('Error converting amount:', error);
@@ -1109,7 +1329,7 @@ export class PaymentLinkTransactionService {
 
   async processPayment(transactionId: string): Promise<void> {
     const transaction = await this.prisma.transaction.findUnique({
-      where: { id: transactionId }
+      where: { id: transactionId },
     });
 
     if (!transaction) {
@@ -1120,9 +1340,290 @@ export class PaymentLinkTransactionService {
     const originalAmount = await this.convertAmount(
       transaction.amount,
       transaction.currency,
-      'USD' // or whatever target currency you need
+      'USD', // or whatever target currency you need
     );
 
     // ... rest of the code ...
   }
-} 
+
+  async findPaymentLinkById(id: string) {
+    return this.prisma.paymentLink.findUnique({
+      where: { id },
+      include: {
+        user: {
+          include: {
+            wallets: true,
+          },
+        },
+      },
+    });
+  }
+
+  private async handleCardPayment(
+    paymentLink: any,
+    customer: any,
+    amount: number,
+    currency: string,
+    buyerWalletAddress: string,
+  ): Promise<any> {
+    try {
+      // Ensure seller has Stripe account
+      if (!paymentLink.user.stripeAccount?.id) {
+        throw new BadRequestException(
+          'Seller has not set up payment processing',
+        );
+      }
+
+      // Create transaction record first
+      const transaction = await this.prisma.transaction.create({
+        data: {
+          senderId: customer.id,
+          recipientId: paymentLink.userId,
+          customerId: customer.id,
+          amount,
+          currency,
+          type: paymentLink.transactionType,
+          status: 'PENDING_PAYMENT',
+          paymentMethod: 'CARD',
+          data: {
+            paymentLinkId: paymentLink.id,
+            buyerWalletAddress,
+            serviceDetails: paymentLink.serviceDetails,
+            verificationMethod: paymentLink.verificationMethod,
+          },
+        },
+        include: {
+          customer: true,
+        },
+      });
+
+      // Create Stripe Checkout Session
+      const session = await this.stripeService.createCheckoutSession({
+        amount: amount * 100, // Convert to cents
+        currency: currency.toLowerCase(),
+        customerId: customer.id,
+        customerEmail: customer.email,
+        paymentLinkId: paymentLink.id,
+        transactionId: transaction.id,
+        successUrl: `${this.configService.get('FRONTEND_URL')}/payment/success?txId=${transaction.id}`,
+        cancelUrl: `${this.configService.get('FRONTEND_URL')}/payment/cancel?txId=${transaction.id}`,
+        metadata: {
+          paymentLinkId: paymentLink.id,
+          transactionId: transaction.id,
+          customerEmail: customer.email,
+          buyerWalletAddress,
+        },
+        stripeAccountId: paymentLink.user.stripeAccount.id,
+      });
+
+      // Return checkout information
+      return {
+        id: transaction.id,
+        status: 'PENDING_PAYMENT',
+        checkoutUrl: session.url,
+        sessionId: session.id,
+        amount,
+        currency,
+        paymentMethod: 'CARD',
+        customer: {
+          email: customer.email,
+          name: customer.name,
+        },
+      };
+    } catch (error) {
+      this.logger.error('Error handling card payment:', error);
+      throw new BadRequestException(
+        error.message || systemResponses.EN.PAYMENT_PROCESSING_FAILED,
+      );
+    }
+  }
+
+  // Add webhook handler for Stripe events
+  async handleStripeWebhook(event: any) {
+    try {
+      switch (event.type) {
+        case 'checkout.session.completed':
+          await this.handleSuccessfulPayment(event.data.object);
+          break;
+        case 'payment_intent.payment_failed':
+          await this.handleFailedPayment(event.data.object);
+          break;
+      }
+    } catch (error) {
+      this.logger.error('Error handling Stripe webhook:', error);
+      throw new BadRequestException(
+        error.message || systemResponses.EN.WEBHOOK_PROCESSING_FAILED,
+      );
+    }
+  }
+
+  private async handleSuccessfulPayment(session: any) {
+    const transactionId = session.metadata.transactionId;
+    const transaction = await this.prisma.transaction.findUnique({
+      where: { id: transactionId },
+      include: {
+        paymentLink: true,
+        customer: true,
+      },
+    });
+
+    if (!transaction) {
+      throw new BadRequestException('Transaction not found');
+    }
+
+    // Update transaction status
+    await this.prisma.transaction.update({
+      where: { id: transactionId },
+      data: {
+        status: 'PAYMENT_COMPLETED',
+        paymentConfirmed: true,
+        data: {
+          ...(typeof transaction.data === 'object' ? transaction.data : {}),
+          stripeSessionId: session.id,
+          paymentConfirmedAt: new Date(),
+        },
+      },
+    });
+
+    // Send confirmation emails
+    await this.sendPaymentConfirmationEmails(transaction);
+  }
+
+  private async handleFailedPayment(paymentIntent: any) {
+    const transactionId = paymentIntent.metadata.transactionId;
+    await this.prisma.transaction.update({
+      where: { id: transactionId },
+      data: {
+        status: 'PAYMENT_FAILED',
+        data: {
+          failureReason:
+            paymentIntent.last_payment_error?.message || 'Payment failed',
+        },
+      },
+    });
+  }
+
+  private async createCustomerWallet(
+    customer: any,
+    customerEmail: string,
+  ): Promise<any> {
+    const wallet = await this.ethereumWalletService.generateWallet();
+    const customerWallet = await this.prisma.wallet.create({
+      data: {
+        userId: customer.id,
+        address: wallet.address,
+        encryptedPrivateKey: wallet.encryptedPrivateKey,
+        iv: wallet.iv,
+        network: 'ETHEREUM',
+        type: 'ETHEREUM',
+        chainId: 1,
+      },
+    });
+
+    // Create custodial wallet
+    await this.prisma.custodialWallet.create({
+      data: {
+        userId: customer.id,
+        address: wallet.address,
+        chainId: 1,
+        network: 'ETHEREUM',
+        type: 'CUSTODIAL',
+        status: 'ACTIVE',
+        balance: '0',
+        token: 'ETH',
+      },
+    });
+
+    // Send wallet info to customer
+    await this.emailService.sendEmail({
+      to: [customerEmail],
+      subject: 'Your Escrow Wallet Details',
+      html: `
+        <h2>Your Escrow Wallet Has Been Created</h2>
+        <p>To ensure secure transactions, we've created an Ethereum wallet for you:</p>
+        <p>Wallet Address: ${wallet.address}</p>
+        <p><strong>Important:</strong> Please save your wallet credentials securely.</p>
+        <p>You can use this wallet for all future escrow transactions.</p>
+        <p>For security reasons, private key details will be sent in a separate email.</p>
+      `,
+    });
+
+    // Send private key in separate email
+    const decryptedPrivateKey = await this.walletEncryptionService.decrypt(
+      wallet.encryptedPrivateKey,
+      wallet.iv,
+    );
+
+    if (decryptedPrivateKey) {
+      await this.emailService.sendEmail({
+        to: [customerEmail],
+        subject: 'Your Wallet Private Key',
+        html: `
+          <h2>Important: Your Wallet Private Key</h2>
+          <p><strong>Warning:</strong> Keep this information strictly confidential.</p>
+          <p>Private Key: ${decryptedPrivateKey}</p>
+          <p>Never share this private key with anyone.</p>
+          <p>Store it securely as it cannot be recovered if lost.</p>
+        `,
+      });
+    }
+
+    return customerWallet;
+  }
+
+  private async sendWalletEmails(
+    customerEmail: string,
+    wallet: IWalletResponse,
+  ) {
+    // First email with public info
+    await this.emailService.sendEmail({
+      to: [customerEmail],
+      subject: 'Your Escrow Wallet Details',
+      html: `
+        <h2>Your Escrow Wallet Has Been Created</h2>
+        <p>To ensure secure transactions, we've created an Ethereum wallet for you:</p>
+        <p>Wallet Address: ${wallet.address}</p>
+        <p><strong>Important:</strong> Please save your wallet credentials securely.</p>
+        <p>You can use this wallet for all future escrow transactions.</p>
+        <p>For security reasons, private key details will be sent in a separate email.</p>
+      `,
+    });
+
+    // Only send private key email if we can decrypt it
+    try {
+      const decryptedWallet = ethers.Wallet.fromEncryptedJsonSync(
+        wallet.encryptedPrivateKey,
+        wallet.iv,
+      );
+
+      await this.emailService.sendEmail({
+        to: [customerEmail],
+        subject: 'Your Wallet Private Key',
+        html: `
+          <h2>Important: Your Wallet Private Key</h2>
+          <p><strong>Warning:</strong> Keep this information strictly confidential.</p>
+          <p>Private Key: ${decryptedWallet.privateKey}</p>
+          <p>Never share this private key with anyone.</p>
+          <p>Store it securely as it cannot be recovered if lost.</p>
+        `,
+      });
+    } catch (error) {
+      this.logger.error('Error decrypting wallet for email:', error);
+    }
+  }
+
+  private async sendPaymentConfirmationEmails(transaction: any) {
+    const { customer, paymentLink } = transaction;
+
+    await this.emailService.sendEmail({
+      to: [customer.email],
+      subject: 'Payment Confirmation',
+      html: `
+        <h2>Payment Confirmed</h2>
+        <p>Your payment has been successfully processed.</p>
+        <p>Transaction ID: ${transaction.id}</p>
+        <p>Amount: ${transaction.amount} ${transaction.currency}</p>
+      `,
+    });
+  }
+}

@@ -8,43 +8,49 @@ datasource db {
 }
 
 model User {
-  id                   String               @id @default(cuid())
-  email                String               @unique
+  id                   String                     @id @default(cuid())
+  email                String                     @unique
   password             String
   firstName            String
   lastName             String
   country              String
   organisation         String
-  walletAddress        String?              @unique
-  role                 UserRole             @default(DEVELOPER)
-  isVerified           Boolean              @default(false)
+  role                 UserRole                   @default(DEVELOPER)
+  walletAddress        String?
+  status               String                     @default("ACTIVE")
+  name                 String?                    // Add name field for customer compatibility
+  stripeAccountId      String?
+  stripeAccountStatus  String                     @default("PENDING")
+  isVerified           Boolean                    @default(false)
   otp                  String?
   otpExpiry            DateTime?
-  createdAt            DateTime             @default(now())
-  updatedAt            DateTime             @updatedAt
-  balance              Balance?
-  wallet               Wallet?
-  sentTransactions     Transaction[]        @relation("SentTransactions")
-  receivedTransactions Transaction[]        @relation("ReceivedTransactions")
+  createdAt            DateTime                   @default(now())
+  updatedAt            DateTime                   @updatedAt
+  balance              Balance?                   @relation("UserBalance")
+  wallets              Wallet[]                   @relation("UserWallets")
+  sentTransactions     Transaction[]              @relation("SentTransactions")
+  receivedTransactions Transaction[]              @relation("ReceivedTransactions")
+  customerTransactions Transaction[]              @relation("CustomerTransactions")
   paymentRequests      PaymentRequest[]
   paymentLinks         PaymentLink[]
   paymentLinkSettings  PaymentLinkSettings?
-  initiatedDisputes    Dispute[]            @relation("DisputeInitiator")
-  resolvedDisputes     Dispute[]            @relation("DisputeResolver")
+  initiatedDisputes    Dispute[]                  @relation("DisputeInitiator")
+  resolvedDisputes     Dispute[]                  @relation("DisputeResolver")
   subscriptions        Subscription[]
   paymentMethods       PaymentMethod[]
   autoPaymentSettings  AutoPaymentSettings?
   billingHistory       BillingHistory[]
   phone                String?
   photoUrl             String?
-  twoFactorEnabled     Boolean              @default(false)
+  twoFactorEnabled     Boolean                    @default(false)
   twoFactorSecret      String?
   apiSettings          ApiSettings?
   kycVerification      KycVerification?
   supportTickets       SupportTicket[]
   chatSessions         ChatSession[]
   cryptoReservations   CryptoBalanceReservation[]
-  custodialWallets    CustodialWallet[]
+  custodialWallets     CustodialWallet[]
+  stripeAccount        StripeAccount?
 
   @@map("users")
 }
@@ -61,7 +67,7 @@ model Balance {
   usd       Float    @default(0)
   eur       Float    @default(0)
   esp       Float    @default(0)
-  user      User     @relation(fields: [userId], references: [id])
+  user      User     @relation("UserBalance", fields: [userId], references: [id])
   updatedAt DateTime @updatedAt
 
   @@map("balances")
@@ -69,11 +75,10 @@ model Balance {
 
 model Transaction {
   id                String      @id @default(cuid())
-  senderId          String
+  senderId          String?
   recipientId       String?
   recipientWallet   String?
-  customerId        String
-  customer          Customer    @relation(fields: [customerId], references: [id])
+  customerId        String?
   amount            Float
   currency          String
   type              String
@@ -83,22 +88,33 @@ model Transaction {
   chainId           Int?
   tokenAddress      String?
   escrowAddress     String?
-  originalAmount    Float?
-  originalCurrency  String?
   paymentMethod     String?
   paymentDetails    Json?
+  metadata          Json?
+  customerEmail     String?
+  customerName      String?
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+  expiresAt         DateTime?
+  completedAt       DateTime?
+  paymentLinkId     String?
+  originalAmount    Float?
+  originalCurrency  String?
   paymentConfirmed  Boolean     @default(false)
   buyerConfirmed    Boolean     @default(false)
   sellerConfirmed   Boolean     @default(false)
-  createdAt         DateTime    @default(now())
-  expiresAt         DateTime?
+  verificationState String?
   data              Json?
-  method            String?
-  verificationState String?     @default("INITIATED")
-  milestones        Milestone[]
-  sender            User        @relation("SentTransactions", fields: [senderId], references: [id])
+  sender            User?       @relation("SentTransactions", fields: [senderId], references: [id])
   recipient         User?       @relation("ReceivedTransactions", fields: [recipientId], references: [id])
+  customer          User?       @relation("CustomerTransactions", fields: [customerId], references: [id], map: "transactions_user_customer_fkey")
+  customerRef       Customer?   @relation("CustomerTransactions", fields: [customerId], references: [id], map: "transactions_customer_ref_fkey")
+  paymentLink       PaymentLink? @relation(fields: [paymentLinkId], references: [id])
   disputes          Dispute[]
+  milestones        Milestone[]
+  stripePaymentId   String?
+  sandboxData       Json?      // For sandbox-specific data
+  dealStage         String?    // Current deal stage
 
   @@map("transactions")
 }
@@ -120,7 +136,7 @@ model PaymentRequest {
 
 model Wallet {
   id                  String   @id @default(cuid())
-  userId              String   @unique
+  userId              String
   address             String   @unique
   encryptedPrivateKey String
   iv                  String
@@ -129,27 +145,45 @@ model Wallet {
   chainId             Int
   createdAt           DateTime @default(now())
   updatedAt           DateTime @updatedAt
-  user                User     @relation(fields: [userId], references: [id])
+  user                User     @relation("UserWallets", fields: [userId], references: [id])
 
   @@unique([userId, network])
+  @@index([userId])
+  @@map("wallets")
 }
 
 model PaymentLink {
-  id                String              @id @default(cuid())
-  name              String
-  url               String
-  type              String              // BUYING or SELLING
-  transactionType   String              // CRYPTOCURRENCY, PHYSICAL_GOODS, etc.
-  status            String              @default("ACTIVE")
-  defaultAmount     Float?
-  defaultCurrency   String?
-  details           Json?               // Stores the cryptocurrency or other details
-  verificationMethod String?
-  userId            String
-  createdBy         User               @relation(fields: [userId], references: [id])
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  expiresAt         DateTime?
+  id                 String    @id @default(cuid())
+  userId             String
+  name               String
+  url                String    @unique
+  type               String    // BUYING or SELLING
+  transactionType    String    // CRYPTOCURRENCY, SERVICES, or DEALS
+  defaultAmount      Float
+  defaultCurrency    String
+  isAmountNegotiable Boolean   @default(false)
+  minimumAmount      Float?
+  maximumAmount      Float?
+  paymentMethods     Json      // Array of payment method objects
+  serviceDetails     Json?     // Service details as JSON
+  serviceProof       Json?     // Service proof requirements as JSON
+  metadata           Json?     // Additional metadata
+  verificationMethod String
+  allowedBuyers      String[]  @default([])
+  status             String    @default("ACTIVE")
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+  expiresAt          DateTime?
+  transactions       Transaction[]
+  stripeConnect      StripeAccount? @relation(fields: [stripeConnectId], references: [id])
+  stripeConnectId    String?
+  details            Json?     // Add this field for cryptocurrency details
+  isSandbox          Boolean   @default(true)
+  sandboxMetadata    Json?     // For sandbox-specific data
+  dealStages         Json?     // For deal-specific stages
+  completedStages    String[]  @default([])
+
+  user               User                @relation(fields: [userId], references: [id])
   paymentLinkMethods PaymentLinkMethod[]
 
   @@map("payment_links")
@@ -334,9 +368,8 @@ model Milestone {
   transactionId String
   transaction   Transaction @relation(fields: [transactionId], references: [id])
   description   String
-  amount        Float
-  order         Int
-  status        String
+  status        String      @default("PENDING")
+  dueDate       DateTime?
   completedAt   DateTime?
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -365,22 +398,13 @@ enum VerificationMethod {
   MANUAL_HASH
 }
 
-model Customer {
-  id            String        @id @default(uuid())
-  email         String        @unique
-  name          String?
-  transactions  Transaction[]
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
-}
-
 model CryptoBalanceReservation {
   id           String   @id @default(cuid())
   userId       String
   tokenAddress String
   chainId      Int
   amount       Float
-  status       String   // RESERVED, RELEASED, USED
+  status       String // RESERVED, RELEASED, USED
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   user         User     @relation(fields: [userId], references: [id])
@@ -404,7 +428,7 @@ model CustodialWallet {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
-  user          User     @relation(fields: [userId], references: [id])
+  user           User                      @relation(fields: [userId], references: [id])
   balanceHistory CustodialBalanceHistory[]
 
   @@unique([userId, token, chainId])
@@ -418,24 +442,46 @@ model CustodialBalanceHistory {
   type      String
   timestamp DateTime @default(now())
 
-  wallet    CustodialWallet @relation(fields: [walletId], references: [id])
+  wallet CustodialWallet @relation(fields: [walletId], references: [id])
 
   @@map("custodial_balance_history")
 }
 
 model BridgeTransaction {
-  id              String   @id @default(cuid())
-  sourceToken     String
-  sourceChainId   Int
-  targetToken     String
-  targetChainId   Int
-  amount          String
-  userAddress     String
-  status          String
-  txHash          String?
-  targetTxHash    String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String   @id @default(cuid())
+  sourceToken   String
+  sourceChainId Int
+  targetToken   String
+  targetChainId Int
+  amount        String
+  userAddress   String
+  status        String
+  txHash        String?
+  targetTxHash  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@map("bridge_transactions")
+}
+
+model StripeAccount {
+  id            String        @id
+  userId        String        @unique
+  user          User          @relation(fields: [userId], references: [id])
+  paymentLinks  PaymentLink[]
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("stripe_accounts")
+}
+
+model Customer {
+  id            String        @id @default(cuid())
+  email         String        @unique
+  name          String?
+  transactions  Transaction[] @relation("CustomerTransactions")
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@map("customers")
 }

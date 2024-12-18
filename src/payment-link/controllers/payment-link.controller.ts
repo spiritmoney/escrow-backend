@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Body, UseGuards, Patch, Param, HttpException, HttpStatus, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, UseGuards, Patch, Param, HttpException, HttpStatus, Query, Request, Delete, Put } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../auth/decorators/current-user.decorator';
 import { PaymentLinkService } from '../services/payment-link.service';
-import { CreatePaymentLinkDto, UpdatePaymentLinkSettingsDto, InitiateTransactionDto } from '../dto/payment-link.dto';
+import { CreatePaymentLinkDto, UpdatePaymentLinkSettingsDto, InitiateTransactionDto, UpdatePaymentLinkDto } from '../dto/payment-link.dto';
 import { systemResponses } from '../../contracts/system.responses';
 import { PaymentLinkTransactionService } from '../services/payment-link-transaction.service';
 
@@ -37,8 +37,6 @@ interface SuccessDetailsResponse {
 }
 
 @ApiTags('payment-links')
-@ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('payment-links')
 export class PaymentLinkController {
   constructor(
@@ -46,6 +44,7 @@ export class PaymentLinkController {
     private paymentLinkTransactionService: PaymentLinkTransactionService
   ) {}
 
+  @UseGuards(JwtAuthGuard)
   @Get()
   @ApiOperation({ summary: 'Get active payment links' })
   @ApiResponse({
@@ -81,6 +80,7 @@ export class PaymentLinkController {
     }
   }
 
+  @UseGuards(JwtAuthGuard)
   @Post()
   @ApiOperation({ summary: 'Create new payment link' })
   @ApiResponse({
@@ -164,9 +164,17 @@ export class PaymentLinkController {
     @Body() transactionDto: InitiateTransactionDto
   ) {
     try {
+      const amount = typeof transactionDto.amount === 'string' 
+        ? parseFloat(transactionDto.amount) 
+        : transactionDto.amount;
+
       const transaction = await this.paymentLinkService.initiateTransaction(
         linkId,
-        transactionDto
+        {
+          ...transactionDto,
+          amount,
+          paymentMethod: transactionDto.paymentMethod || 'CARD'
+        }
       );
       
       return {
@@ -176,10 +184,11 @@ export class PaymentLinkController {
           amount: transaction.amount,
           currency: transaction.currency,
           status: transaction.status,
-          customer: {
-            email: transaction.customer?.email,
-            name: transaction.customer?.name
-          },
+          paymentMethod: transaction.paymentMethod,
+          customer: transaction.customer ? {
+            email: transaction.customer.email,
+            name: transaction.customer.name
+          } : undefined,
           createdAt: transaction.createdAt
         }
       };
@@ -193,23 +202,61 @@ export class PaymentLinkController {
 
   @Get(':id/validate')
   @ApiOperation({ summary: 'Validate payment link and get details' })
-  @ApiResponse({ status: 200, description: 'Payment link details' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Payment link details',
+    schema: {
+      example: {
+        seller: {
+          id: 'user123',
+          name: 'John Doe',
+          organisation: 'Tech Corp',
+          email: 'john@example.com',
+          wallet: {
+            address: '0x123...',
+            network: 'ETHEREUM',
+            chainId: 1
+          }
+        },
+        paymentLink: {
+          id: 'link123',
+          name: 'Premium Service',
+          type: 'SELLING',
+          transactionType: 'SERVICES',
+          defaultAmount: 100,
+          defaultCurrency: 'USD',
+          isAmountNegotiable: true,
+          minimumAmount: 50,
+          maximumAmount: 200,
+          paymentMethods: ['CARD', 'CRYPTO'],
+          serviceDetails: {
+            description: 'Premium consulting service',
+            deliveryTimeline: '5 days',
+            terms: {
+              conditions: ['Term 1', 'Term 2'],
+              cancellationPolicy: 'Cancellation policy...',
+              refundPolicy: 'Refund policy...'
+            }
+          },
+          verificationMethod: 'SELLER_PROOF_SUBMISSION',
+          metadata: {
+            customerRequirements: {
+              emailRequired: true,
+              phoneRequired: false,
+              addressRequired: false
+            },
+            escrowConditions: {
+              timeoutPeriod: 24,
+              autoReleaseEnabled: true
+            }
+          }
+        }
+      }
+    }
+  })
   @ApiResponse({ status: 404, description: 'Payment link not found' })
   async validatePaymentLink(@Param('id') id: string) {
-    const paymentLink = await this.paymentLinkService.validatePaymentLink(id);
-    return {
-      id: paymentLink.id,
-      name: paymentLink.name,
-      type: paymentLink.type,
-      transactionType: paymentLink.transactionType,
-      defaultAmount: paymentLink.defaultAmount,
-      defaultCurrency: paymentLink.defaultCurrency,
-      status: paymentLink.status,
-      createdBy: {
-        id: paymentLink.createdBy.id,
-        wallet: paymentLink.createdBy.wallet
-      }
-    };
+    return this.paymentLinkService.validatePaymentLink(id);
   }
 
   @Get(':id/transaction/:txId')
@@ -375,7 +422,11 @@ export class PaymentLinkController {
             paymentMethod: details.transaction.paymentMethod,
             expiresAt: details.transaction.expiresAt
           },
-          paymentLink: details.paymentLink,
+          paymentLink: {
+            name: details.paymentLink.name,
+            type: details.paymentLink.type,
+            transactionType: details.paymentLink.transactionType
+          },
           successMessage: details.successMessage,
           nextSteps: details.nextSteps
         }
@@ -403,5 +454,53 @@ export class PaymentLinkController {
       user.id,
       verificationData
     );
+  }
+
+  @Patch(':id/disable')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Disable a payment link' })
+  @ApiResponse({ 
+    status: 200, 
+    description: 'Payment link disabled successfully' 
+  })
+  @ApiResponse({ 
+    status: 400, 
+    description: 'Bad request' 
+  })
+  @ApiResponse({ 
+    status: 401, 
+    description: 'Unauthorized' 
+  })
+  async disablePaymentLink(
+    @Request() req,
+    @Param('id') id: string,
+  ) {
+    return this.paymentLinkService.disablePaymentLink(req.user.id, id);
+  }
+
+  @Delete(':id')
+  @ApiOperation({ summary: 'Delete a payment link' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payment link deleted successfully' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Payment link not found' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Unauthorized to delete this payment link' })
+  async deletePaymentLink(
+    @CurrentUser() user,
+    @Param('id') linkId: string
+  ) {
+    return this.paymentLinkService.deletePaymentLink(user.id, linkId);
+  }
+
+  @Put(':id')
+  @ApiOperation({ summary: 'Update a payment link' })
+  @ApiResponse({ status: HttpStatus.OK, description: 'Payment link updated successfully' })
+  @ApiResponse({ status: HttpStatus.NOT_FOUND, description: 'Payment link not found' })
+  @ApiResponse({ status: HttpStatus.FORBIDDEN, description: 'Unauthorized to update this payment link' })
+  async updatePaymentLink(
+    @CurrentUser() user,
+    @Param('id') linkId: string,
+    @Body() updateDto: UpdatePaymentLinkDto
+  ) {
+    return this.paymentLinkService.updatePaymentLink(user.id, linkId, updateDto);
   }
 } 

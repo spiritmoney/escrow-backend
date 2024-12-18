@@ -8,6 +8,7 @@ import { validate } from './config/env.validation';
 import { systemResponses } from './contracts/system.responses';
 import { BridgeService } from './services/bridge/bridge.service';
 import { BridgeProvider } from './services/bridge/providers/bridge.provider';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 // Controllers
 import { AuthController } from './auth/controllers/auth.controller';
@@ -21,6 +22,7 @@ import { BillingController } from './subscription/controllers/billing.controller
 import { ProfileController } from './profile/controllers/profile.controller';
 import { SupportController } from './support/controllers/support.controller';
 import { LiveChatController } from './support/controllers/live-chat.controller';
+import { WebhookController } from './payment-link/controllers/webhook.controller';
 
 // Services and Providers
 import { PrismaService } from './prisma/prisma.service';
@@ -50,6 +52,7 @@ import { ApiKeyAuthGuard } from './auth/guards/api-key-auth.guard';
 import { CombinedAuthGuard } from './auth/guards/combined-auth.guard';
 import { SupportService } from './support/services/support.service';
 import { LiveChatService } from './support/services/live-chat.service';
+import { StripeService } from './services/stripe/stripe.service';
 
 // Wallet Services
 import { BitcoinWalletService } from './wallet/services/bitcoin-wallet.service';
@@ -104,6 +107,7 @@ const CloudinaryProvider = {
       }),
       inject: [ConfigService],
     }),
+    EventEmitterModule.forRoot(),
   ],
   controllers: [
     AuthController,
@@ -112,6 +116,7 @@ const CloudinaryProvider = {
     PaymentController,
     TransactionController,
     PaymentLinkController,
+    WebhookController,
     SubscriptionController,
     BillingController,
     ProfileController,
@@ -144,6 +149,7 @@ const CloudinaryProvider = {
     TradeProtectionService,
     EscrowMonitorService,
     DisputeResolutionService,
+    StripeService,
     
     // Subscription Services
     SubscriptionService,
@@ -178,11 +184,16 @@ const CloudinaryProvider = {
     // Bridge Services
     BridgeService,
     BridgeProvider,
+    
+    // Stripe Services
+    StripeService,
   ],
   exports: [
     MultiChainWalletService,
     PrismaService,
     BridgeService,
+    PaymentLinkService,
+    PaymentLinkTransactionService,
   ],
 })
 export class AppModule implements OnModuleInit {

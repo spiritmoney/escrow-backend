@@ -234,7 +234,7 @@ export const systemResponses = {
 
     PAYMENT_LINK_CREATED: 'Payment link created successfully',
 
-    PAYMENT_LINK_NOT_FOUND: 'Payment link not found',
+    PAYMENT_LINK_NOT_FOUND: 'Payment link not found or inactive',
 
     PAYMENT_LINK_EXPIRED: 'Payment link has expired',
 
@@ -452,6 +452,10 @@ export const systemResponses = {
     // Payment Link Related
     PAYMENT_LINK_CREATION_FAILED: 'Failed to create payment link',
     PAYMENT_LINK_INVALID: 'Invalid payment link',
+    PAYMENT_LINK_RETRIEVAL_FAILED: 'Failed to retrieve payment link',
+    PAYMENT_LINK_DISABLED: 'Payment link disabled successfully',
+    PAYMENT_LINK_ALREADY_DISABLED: 'Payment link is already disabled',
+    PAYMENT_LINK_EXISTS: 'Payment link already exists',
 
     // Bridge Related
     BRIDGE_CONVERSION_FAILED: 'Failed to convert tokens through bridge',
@@ -492,5 +496,27 @@ export const systemResponses = {
     TWO_FACTOR_NOT_ENABLED: '2FA is not enabled for this account',
     INVALID_2FA_TOKEN: 'Invalid 2FA token',
     TWO_FACTOR_DISABLED: '2FA has been disabled successfully',
+
+    // Stripe Related
+    STRIPE_ACCOUNT_CREATION_FAILED: 'Failed to create Stripe account',
+    STRIPE_LINK_CREATION_FAILED: 'Failed to create Stripe account link',
+    STRIPE_CHECKOUT_FAILED: 'Failed to create checkout session',
+    WEBHOOK_PROCESSING_FAILED: 'Failed to process webhook',
+    PAYMENT_PROCESSING_FAILED: 'Failed to process payment',
+    STRIPE_TRANSFER_FAILED: 'Failed to transfer funds',
+    TRANSACTION_INITIATION_FAILED: 'Failed to initiate transaction. Please try again.',
+
+    // Payment Link Related
+    PAYMENT_LINK_DELETED: 'Payment link deleted successfully',
+    PAYMENT_LINK_DELETE_FAILED: 'Failed to delete payment link',
+    PAYMENT_LINK_UPDATED: 'Payment link updated successfully',
+    PAYMENT_LINK_HAS_ACTIVE_TRANSACTIONS: 'Cannot delete payment link with active transactions',
+
+    INVALID_CRYPTO_DETAILS: 'Invalid cryptocurrency payment details',
+    SANDBOX_MODE_ENABLED: 'This is a sandbox payment link',
+    SANDBOX_MODE_WARNING: 'This is a sandbox payment link',
+    SANDBOX_MODE_PAYMENT_METHODS: 'This is a sandbox payment link',
+    SANDBOX_MODE_DEFAULT_PAYMENT_METHOD: 'This is a sandbox payment link',
+    SANDBOX_MODE_PAYMENT_METHOD_SETTINGS: 'This is a sandbox payment link',
   },
 };

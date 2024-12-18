@@ -670,7 +670,16 @@ export class BlockchainService {
     }
   }
 
-  async releaseEscrow(escrowAddress: string, privateKey: string) {
+  async releaseEscrow(
+    escrowAddress: string, 
+    privateKey: string,
+    isSandbox: boolean = false
+  ): Promise<boolean> {
+    if (isSandbox) {
+      // Simulate escrow release for sandbox
+      return true;
+    }
+
     try {
       const escrowAbi = [
         'function release() external',
@@ -747,8 +756,14 @@ export class BlockchainService {
 
   async validateTransaction(
     transactionHash: string,
-    escrowAddress: string
+    escrowAddress: string,
+    isSandbox: boolean = false
   ): Promise<boolean> {
+    if (isSandbox) {
+      // Always return success for sandbox transactions
+      return true;
+    }
+
     try {
       // Get transaction details
       const transaction = await this.provider.getTransaction(transactionHash);
@@ -870,10 +885,11 @@ export class BlockchainService {
 
   private async getUserWallet(userId: string) {
     const wallet = await this.prisma.wallet.findUnique({
-      where: { userId },
-      select: {
-        address: true,
-        encryptedPrivateKey: true
+      where: { 
+        userId_network: {
+          userId: userId,
+          network: 'ETHEREUM'
+        }
       }
     });
 
@@ -994,7 +1010,7 @@ export class BlockchainService {
 
       // Get buyer's wallet
       const buyerWallet = await this.prisma.wallet.findUnique({
-        where: { userId }
+        where: { userId_network: { userId, network: 'ETHEREUM' } }
       });
 
       if (!buyerWallet) {
@@ -1132,5 +1148,10 @@ export class BlockchainService {
       this.logger.error('Error validating private key:', error);
       throw new BadRequestException(systemResponses.EN.INVALID_WALLET_CREDENTIALS);
     }
+  }
+
+  async createTestEscrow(): Promise<string> {
+    // Generate a fake escrow address for testing
+    return `0xTestEscrow${Math.random().toString(36).substring(7)}`;
   }
 } 

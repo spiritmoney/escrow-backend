@@ -10,7 +10,11 @@ export enum Currency {
   NGN = 'NGN',
   USD = 'USD',
   EUR = 'EUR',
-  ESP = 'ESP'
+  ESP = 'ESP',
+  BTC = 'BTC',
+  ETH = 'ETH',
+  USDT = 'USDT',
+  USDC = 'USDC'
 }
 
 export enum TransactionType {

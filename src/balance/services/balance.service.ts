@@ -2,13 +2,14 @@ import {
   Injectable,
   BadRequestException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../../prisma/prisma.service';
 import { UserRepository } from '../../auth/repositories/user.repository';
 import { MultiChainWalletService } from '../../wallet/services/multi-chain-wallet.service';
 import { IBalanceService, UserBalances } from '../interfaces/balance.interface';
-import { SendMoneyDto, RequestPaymentDto, AssetType } from '../dto/balance.dto';
+import { SendMoneyDto, RequestPaymentDto, AssetType, Currency } from '../dto/balance.dto';
 import { ethers } from 'ethers';
 import { systemResponses } from '../../contracts/system.responses';
 import { NodemailerService } from '../../services/nodemailer/NodemailerService';
@@ -19,12 +20,13 @@ import {
 } from '../../wallet/constants/crypto.constants';
 import { WalletType } from 'src/wallet/enums/wallet.enum';
 import { UserRole } from '@prisma/client';
+import { randomUUID } from 'crypto';
 
-type Currency = 'NGN' | 'USD' | 'EUR' | 'ESP';
 
 @Injectable()
 export class BalanceService implements IBalanceService {
   private readonly isSandbox: boolean;
+  private readonly logger = new Logger(BalanceService.name);
 
   constructor(
     private prisma: PrismaService,
@@ -415,6 +417,39 @@ export class BalanceService implements IBalanceService {
     }
   }
 
+  public async getOrCreateSystemUser(): Promise<any> {
+    try {
+      // First try to find the system user
+      let systemUser = await this.prisma.user.findFirst({
+        where: {
+          email: 'system@example.com',
+          role: UserRole.DEVELOPER
+        }
+      });
+
+      // Create the system user if it doesn't exist
+      if (!systemUser) {
+        systemUser = await this.prisma.user.create({
+          data: {
+            email: 'system@example.com',
+            firstName: 'System',
+            lastName: 'User',
+            password: randomUUID(), // Generate a random password
+            country: 'System',
+            organisation: 'System',
+            name: 'System User',
+            role: UserRole.DEVELOPER,
+          },
+        });
+      }
+
+      return systemUser;
+    } catch (error) {
+      this.logger.error('Error getting/creating system user:', error);
+      throw new BadRequestException(systemResponses.EN.TRANSACTION_FAILED);
+    }
+  }
+
   async createTransaction(data: {
     senderId: string;
     recipientId: string;
@@ -423,35 +458,71 @@ export class BalanceService implements IBalanceService {
     type: string;
     note?: string;
   }) {
-    // Create a default customer for balance transactions
-    const defaultCustomer = await this.prisma.user.create({
-      data: {
-        email: 'system@example.com',
-        firstName: 'System',
-        lastName: '',
-        password: '',
-        country: '',
-        organisation: '',
-        name: 'System',
-        role: UserRole.DEVELOPER,
-      },
-    });
+    try {
+      // Get sender and recipient to verify they exist
+      const [sender, recipient] = await Promise.all([
+        this.userRepository.findById(data.senderId),
+        this.userRepository.findById(data.recipientId)
+      ]);
 
-    return this.prisma.transaction.create({
-      data: {
-        sender: { connect: { id: data.senderId } },
-        recipient: { connect: { id: data.recipientId } },
-        customer: { connect: { id: defaultCustomer.id } },
-        amount: data.amount,
-        currency: data.currency,
-        type: data.type,
-        status: 'COMPLETED',
-        note: data.note || '',
+      if (!sender || !recipient) {
+        throw new BadRequestException('Invalid sender or recipient');
+      }
+
+      // Create the transaction
+      const transaction = await this.prisma.transaction.create({
+        data: {
+          sender: { connect: { id: data.senderId } },
+          recipient: { connect: { id: data.recipientId } },
+          amount: data.amount,
+          currency: data.currency,
+          type: data.type,
+          status: 'COMPLETED',
+          note: data.note || '',
+          customerEmail: sender.email,
+          customerName: sender.name || `${sender.firstName} ${sender.lastName}`.trim(),
+        },
+        include: {
+          sender: true,
+          recipient: true,
+        },
+      });
+
+      // Update recipient's balance
+      await this.updateUserBalance(
+        data.recipientId,
+        data.amount,
+        data.currency,
+        'add'
+      );
+
+      return transaction;
+    } catch (error) {
+      this.logger.error('Error creating transaction:', error);
+      throw new BadRequestException(systemResponses.EN.TRANSACTION_FAILED);
+    }
+  }
+
+  // Add helper method to update user balance
+  private async updateUserBalance(
+    userId: string,
+    amount: number,
+    currency: Currency,
+    operation: 'add' | 'subtract'
+  ) {
+    const multiplier = operation === 'add' ? 1 : -1;
+    const fieldName = currency.toLowerCase();
+
+    await this.prisma.balance.upsert({
+      where: { userId },
+      create: {
+        userId,
+        [fieldName]: operation === 'add' ? amount : 0,
       },
-      include: {
-        sender: true,
-        recipient: true,
-        customer: true,
+      update: {
+        [fieldName]: {
+          increment: amount * multiplier,
+        },
       },
     });
   }

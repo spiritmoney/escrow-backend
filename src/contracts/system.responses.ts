@@ -507,6 +507,7 @@ export const systemResponses = {
     TRANSACTION_INITIATION_FAILED: 'Failed to initiate transaction. Please try again.',
 
     // Payment Link Related
+    PAYMENT_LINK_FETCH_FAILED: 'Failed to fetch payment links',
     PAYMENT_LINK_DELETED: 'Payment link deleted successfully',
     PAYMENT_LINK_DELETE_FAILED: 'Failed to delete payment link',
     PAYMENT_LINK_UPDATED: 'Payment link updated successfully',
@@ -518,5 +519,6 @@ export const systemResponses = {
     SANDBOX_MODE_PAYMENT_METHODS: 'This is a sandbox payment link',
     SANDBOX_MODE_DEFAULT_PAYMENT_METHOD: 'This is a sandbox payment link',
     SANDBOX_MODE_PAYMENT_METHOD_SETTINGS: 'This is a sandbox payment link',
+    PAYMENT_LINK_ALREADY_USED: 'This payment link has already been used and cannot be used again',
   },
 };

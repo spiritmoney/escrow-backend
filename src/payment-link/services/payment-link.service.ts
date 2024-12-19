@@ -5,7 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Prisma } from '@prisma/client';
+import { Prisma, UserRole } from '@prisma/client';
 import { BlockchainService } from '../../services/blockchain/blockchain.service';
 import { MultiChainWalletService } from '../../wallet/services/multi-chain-wallet.service';
 import {
@@ -15,7 +15,6 @@ import {
   PaymentLinkType,
   CryptocurrencyDetails,
   VerificationMethod,
-  PaymentLinkMetadata,
   PaymentEnvironment,
   PaymentMethodType,
   UpdatePaymentLinkDto,
@@ -36,6 +35,9 @@ import {
   ServiceProof,
 } from '../interfaces/payment-link.interface';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { BalanceService } from '../../balance/services/balance.service';
+import { ConversionService } from '../../balance/services/conversion.service';
+import { Currency } from '../../balance/dto/balance.dto';
 
 interface TransactionResponse {
   id: string;
@@ -255,45 +257,36 @@ const SUPPORTED_NETWORKS = {
   },
 };
 
-// Update the PaymentLinkMetadataType interface to include all needed properties
+// Update the PaymentLinkMetadataType interface
 interface PaymentLinkMetadataType {
   sandboxMode: boolean;
   sandboxWarning: string;
-  paymentMethods: {
-    card: {
-      testCards: Array<{
+  paymentMethods: Array<{
+    id: string;
+    type: PaymentMethodType;
+    isDefault: boolean;
+    details: {
+      testCards?: Array<{
         number: string;
         expiry: string;
         cvc: string;
         type: string;
       }>;
-      instructions: string;
-    };
-    bankTransfer: {
-      testAccounts: Array<{
+      testAccounts?: Array<{
         bankName: string;
         accountNumber: string;
         routingNumber: string;
       }>;
-      instructions: string;
-    };
-    cryptocurrency: {
-      testWallets: Array<{
+      testWallets?: Array<{
         address: string;
         privateKey: string;
       }>;
-      instructions: string;
+      instructions?: string;
     };
-  };
+  }>;
   availablePaymentMethods: PaymentMethodType[];
   defaultPaymentMethod?: PaymentMethodType;
   paymentMethodSettings?: {
-    cryptocurrency?: {
-      supportedNetworks?: string[];
-      supportedTokens?: string[];
-      minimumAmount?: number;
-      maximumAmount?: number;
-    };
     card?: {
       supportedCards?: string[];
       minimumAmount?: number;
@@ -301,6 +294,12 @@ interface PaymentLinkMetadataType {
     };
     bankTransfer?: {
       supportedBanks?: string[];
+      minimumAmount?: number;
+      maximumAmount?: number;
+    };
+    cryptocurrency?: {
+      supportedTokens?: string[];
+      supportedNetworks?: string[];
       minimumAmount?: number;
       maximumAmount?: number;
     };
@@ -324,85 +323,149 @@ interface PaymentLinkMetadataType {
   customStageRules?: Record<string, any>;
 }
 
+// Add this interface at the top of the file
+interface PaymentLinkMetadata {
+  sandboxMode?: boolean;
+  sandboxWarning?: string;
+  paymentMethods?: Record<string, any>;
+  availablePaymentMethods?: string[];
+  defaultPaymentMethod?: string;
+  paymentMethodSettings?: Record<string, any>;
+  completedAt?: string;
+  completedBy?: string;
+  finalAmount?: number;
+  finalCurrency?: string;
+  [key: string]: any;
+}
+
 @Injectable()
 export class PaymentLinkService {
   private readonly logger = new Logger(PaymentLinkService.name);
 
-  // First, update the SANDBOX_PAYMENT_METHODS structure to match the interface
-  private readonly SANDBOX_PAYMENT_METHODS = {
-    card: {  // Changed from CARD to card
-      testCards: [
-        {
-          number: '4242424242424242',
-          expiry: '12/25',
-          cvc: '123',
-          type: 'Visa'
+  // First, update the return type of generatePaymentLinkMetadata
+  private async generatePaymentLinkMetadata(
+    dto: CreatePaymentLinkDto,
+  ): Promise<PaymentLinkMetadataType> {
+    const metadata: PaymentLinkMetadataType = {
+      sandboxMode: true,
+      sandboxWarning: 'This is a sandbox payment link. No real money will be transferred.',
+      paymentMethods: this.transformPaymentMethodsToMetadata(dto.paymentMethods),
+      availablePaymentMethods: dto.paymentMethods.map(m => m.type),
+      defaultPaymentMethod: dto.paymentMethods.find(m => m.isDefault)?.type || PaymentMethodType.CARD,
+      paymentMethodSettings: {
+        card: {
+          supportedCards: ['visa', 'mastercard'],
+          minimumAmount: dto.minimumAmount || 0,
+          maximumAmount: dto.maximumAmount || null,
         },
-        {
-          number: '5555555555554444',
-          expiry: '12/25',
-          cvc: '123',
-          type: 'Mastercard'
-        }
-      ],
-      instructions: 'Use any of the test card numbers above for card payments'
+        bankTransfer: {
+          supportedBanks: ['all'],
+          minimumAmount: dto.minimumAmount || 0,
+          maximumAmount: dto.maximumAmount || null,
+        },
+        cryptocurrency: {
+          supportedTokens: dto.cryptocurrencyDetails?.acceptedTokens || ['BTC', 'ETH', 'USDT'],
+          supportedNetworks: dto.cryptocurrencyDetails?.networkOptions?.map(n => n.name) || ['ETHEREUM', 'BITCOIN'],
+          minimumAmount: dto.minimumAmount || 0,
+          maximumAmount: dto.maximumAmount || null,
+        },
+      }
+    };
+
+    return metadata;
+  }
+
+  // Then, update the SANDBOX_PAYMENT_METHODS initialization to match the PaymentLinkMetadataType structure
+  private readonly SANDBOX_PAYMENT_METHODS: PaymentLinkMetadataType['paymentMethods'] = [
+    {
+      id: 'card-default',
+      type: PaymentMethodType.CARD,
+      isDefault: true,
+      details: {
+        testCards: [
+          {
+            number: '4242424242424242',
+            expiry: '12/25',
+            cvc: '123',
+            type: 'Visa',
+          },
+          {
+            number: '5555555555554444',
+            expiry: '12/25',
+            cvc: '123',
+            type: 'Mastercard',
+          },
+        ],
+        instructions: 'Use any of the test card numbers above for card payments'
+      }
     },
-    bankTransfer: {  // Changed from BANK_TRANSFER to bankTransfer
-      testAccounts: [
-        {
-          bankName: 'Test Bank',
-          accountNumber: '0123456789',
-          routingNumber: '110000000'
-        }
-      ],
-      instructions: 'Use the test bank account details for bank transfers'
+    {
+      id: 'bank-transfer-default',
+      type: PaymentMethodType.BANK_TRANSFER,
+      isDefault: false,
+      details: {
+        testAccounts: [
+          {
+            bankName: 'Test Bank',
+            accountNumber: '0123456789',
+            routingNumber: '110000000',
+          },
+        ],
+        instructions: 'Use the test bank account details for bank transfers'
+      }
     },
-    cryptocurrency: {  // Changed from CRYPTOCURRENCY to cryptocurrency
-      testWallets: [
-        {
-          address: '0xTestAddress1234567890abcdef',
-          privateKey: '0xTestPrivateKey'
-        }
-      ],
-      instructions: 'Use the test wallet addresses for crypto payments'
+    {
+      id: 'crypto-default',
+      type: PaymentMethodType.CRYPTOCURRENCY,
+      isDefault: false,
+      details: {
+        testWallets: [
+          {
+            address: '0xTestAddress1234567890abcdef',
+            privateKey: '0xTestPrivateKey',
+          },
+        ],
+        instructions: 'Use the test wallet addresses for crypto payments'
+      }
     }
-  };
+  ];
 
   // Keep this as a separate constant for internal use
   private readonly SANDBOX_DEAL_STAGES = {
     stages: {
       DEPOSIT: {
         percentage: 10,
-        description: 'Initial deposit to secure the deal'
+        description: 'Initial deposit to secure the deal',
       },
       MILESTONE_1: {
         percentage: 40,
-        description: 'First milestone payment upon document verification'
+        description: 'First milestone payment upon document verification',
       },
       MILESTONE_2: {
         percentage: 40,
-        description: 'Second milestone payment upon conditions met'
+        description: 'Second milestone payment upon conditions met',
       },
       FINAL: {
         percentage: 10,
-        description: 'Final payment upon deal completion'
-      }
+        description: 'Final payment upon deal completion',
+      },
     },
     testDocuments: [
       {
         type: 'Contract',
-        template: 'sample_contract.pdf'
+        template: 'sample_contract.pdf',
       },
       {
         type: 'Proof of Funds',
-        template: 'proof_of_funds.pdf'
+        template: 'proof_of_funds.pdf',
       },
       {
         type: 'Due Diligence Report',
-        template: 'due_diligence.pdf'
-      }
+        template: 'due_diligence.pdf',
+      },
     ],
-    escrowInstructions: 'Funds will be held in escrow and released according to deal stages'
+    escrowInstructions:
+      'Funds will be held in escrow and released according to deal stages',
   };
 
   constructor(
@@ -415,6 +478,8 @@ export class PaymentLinkService {
     private paymentMethodService: PaymentMethodService,
     private readonly emailService: NodemailerService,
     private eventEmitter: EventEmitter2,
+    private balanceService: BalanceService,
+    private conversionService: ConversionService,
   ) {}
 
   async getActiveLinks(userId: string) {
@@ -468,35 +533,9 @@ export class PaymentLinkService {
       }
 
       // Create metadata object with proper typing
-      const metadata: PaymentLinkMetadataType = {
-        sandboxMode: true,
-        sandboxWarning: 'This is a sandbox payment link. No real money will be transferred.',
-        paymentMethods: this.transformPaymentMethodsToMetadata(createLinkDto.paymentMethods),
-        availablePaymentMethods: [
-          PaymentMethodType.CARD,
-          PaymentMethodType.BANK_TRANSFER,
-          PaymentMethodType.CRYPTOCURRENCY
-        ],
-        defaultPaymentMethod: createLinkDto.paymentMethods.find(m => m.isDefault)?.type || PaymentMethodType.CARD,
-        paymentMethodSettings: {
-          card: {
-            supportedCards: ['visa', 'mastercard'],
-            minimumAmount: createLinkDto.minimumAmount || 0,
-            maximumAmount: createLinkDto.maximumAmount || null
-          },
-          bankTransfer: {
-            supportedBanks: ['all'],
-            minimumAmount: createLinkDto.minimumAmount || 0,
-            maximumAmount: createLinkDto.maximumAmount || null
-          },
-          cryptocurrency: {
-            supportedTokens: createLinkDto.cryptocurrencyDetails?.acceptedTokens || ['BTC', 'ETH', 'USDT'],
-            supportedNetworks: createLinkDto.cryptocurrencyDetails?.networkOptions?.map(n => n.name) || ['ETHEREUM', 'BITCOIN'],
-            minimumAmount: createLinkDto.minimumAmount || 0,
-            maximumAmount: createLinkDto.maximumAmount || null
-          }
-        }
-      };
+      const metadata: PaymentLinkMetadataType = await this.generatePaymentLinkMetadata(
+        createLinkDto,
+      );
 
       // If it's a deal transaction type, add the deal-specific metadata
       if (createLinkDto.transactionType === TransactionType.DEALS) {
@@ -509,15 +548,17 @@ export class PaymentLinkService {
             description: stage.description,
             timelineInDays: stage.timelineInDays,
             requiredDocuments: stage.requiredDocuments,
-            order: index + 1
+            order: index + 1,
           })),
           dealType: createLinkDto.dealDetails.dealType,
           dealTitle: createLinkDto.dealDetails.title,
           dealDescription: createLinkDto.dealDetails.description,
           dealTimeline: createLinkDto.dealDetails.timeline,
-          requireAllPartyApproval: createLinkDto.dealDetails.requireAllPartyApproval ?? true,
-          stageTransitionDelay: createLinkDto.dealDetails.stageTransitionDelay ?? 0,
-          customStageRules: createLinkDto.dealDetails.customStageRules ?? {}
+          requireAllPartyApproval:
+            createLinkDto.dealDetails.requireAllPartyApproval ?? true,
+          stageTransitionDelay:
+            createLinkDto.dealDetails.stageTransitionDelay ?? 0,
+          customStageRules: createLinkDto.dealDetails.customStageRules ?? {},
         });
       }
 
@@ -612,7 +653,7 @@ export class PaymentLinkService {
         {
           sandboxMode: true,
           sandboxWarning: 'This is a sandbox payment link',
-          paymentMethods: this.transformPaymentMethodsToMetadata([]),
+          paymentMethods: this.SANDBOX_PAYMENT_METHODS,
           availablePaymentMethods: [
             PaymentMethodType.CARD,
             PaymentMethodType.BANK_TRANSFER,
@@ -792,26 +833,26 @@ export class PaymentLinkService {
           availablePaymentMethods: [
             PaymentMethodType.CARD,
             PaymentMethodType.BANK_TRANSFER,
-            PaymentMethodType.CRYPTOCURRENCY
+            PaymentMethodType.CRYPTOCURRENCY,
           ],
           defaultPaymentMethod: PaymentMethodType.CARD,
           paymentMethodSettings: {
             cryptocurrency: {
               supportedNetworks: ['ETHEREUM'],
-              supportedTokens: ['ETH']
+              supportedTokens: ['ETH'],
             },
             card: {
               supportedCards: ['visa', 'mastercard'],
               minimumAmount: 0,
-              maximumAmount: null
+              maximumAmount: null,
             },
             bankTransfer: {
               supportedBanks: ['all'],
               minimumAmount: 0,
-              maximumAmount: null
-            }
-          }
-        }
+              maximumAmount: null,
+            },
+          },
+        },
       );
 
       // Use the parsed metadata
@@ -836,20 +877,13 @@ export class PaymentLinkService {
 
   private async handleSandboxTransaction(
     paymentLink: any,
-    transactionDto: InitiateTransactionDto
+    transactionDto: InitiateTransactionDto,
   ): Promise<TransactionResponse> {
     try {
+      // Check if payment link is still valid
+      await this.validatePaymentLinkStatus(paymentLink.id);
+
       const isDeal = paymentLink.transactionType === TransactionType.DEALS;
-      
-      // First create the customer
-      const customer = await this.prisma.customer.upsert({
-        where: { email: transactionDto.customerEmail },
-        update: { name: transactionDto.customerName },
-        create: {
-          email: transactionDto.customerEmail,
-          name: transactionDto.customerName,
-        },
-      });
 
       // Generate mock escrow address for crypto payments
       let escrowAddress = null;
@@ -861,11 +895,11 @@ export class PaymentLinkService {
           network: transactionDto.paymentDetails?.network || 'ETHEREUM',
           tokenSymbol: transactionDto.paymentDetails?.tokenSymbol || 'ETH',
           buyerWalletAddress: transactionDto.buyerWalletAddress,
-          testMode: true
+          testMode: true,
         };
       }
 
-      // Create transaction with proper customer reference
+      // Create transaction with direct customer info
       const transaction = await this.prisma.transaction.create({
         data: {
           amount: transactionDto.amount,
@@ -874,22 +908,28 @@ export class PaymentLinkService {
           type: paymentLink.transactionType,
           paymentMethod: transactionDto.paymentMethod,
           escrowAddress,
-          customerRef: {  // Change this from customer to customerRef
-            connect: { id: customer.id }
-          },
+          customerEmail: transactionDto.customerEmail,
+          customerName: transactionDto.customerName,
           paymentLink: {
-            connect: { id: paymentLink.id }
+            connect: { id: paymentLink.id },
           },
           sender: {
-            connect: { id: paymentLink.userId }
+            connect: { id: paymentLink.userId },
           },
           data: {
             sandboxPayment: true,
-            paymentMethodDetails: this.getSandboxPaymentMethodDetails(transactionDto.paymentMethod),
+            paymentMethodDetails: this.getSandboxPaymentMethodDetails(
+              transactionDto.paymentMethod,
+            ),
             transactionType: paymentLink.transactionType,
             escrowEnabled: true,
             testMode: true,
             paymentDetails,
+            customerInfo: {
+              // Add customer info to data for easy access
+              email: transactionDto.customerEmail,
+              name: transactionDto.customerName,
+            },
             ...(isDeal && {
               dealStage: 'INITIAL',
               dealStages: paymentLink.metadata?.dealStages || [],
@@ -897,37 +937,32 @@ export class PaymentLinkService {
               dealTitle: paymentLink.metadata?.dealTitle,
               dealDescription: paymentLink.metadata?.dealDescription,
               currentStageIndex: 0,
-              requiredDocuments: paymentLink.metadata?.dealStages?.[0]?.requiredDocuments || []
-            })
-          }
+              requiredDocuments:
+                paymentLink.metadata?.dealStages?.[0]?.requiredDocuments || [],
+            }),
+          },
         },
         include: {
-          customerRef: true,  // Change this from customer to customerRef
           paymentLink: {
             include: {
-              user: true
-            }
-          }
-        }
+              user: true,
+            },
+          },
+        },
       });
 
-      // Send notification emails
-      try {
-        await this.sendTransactionEmails(transaction, paymentLink, 'INITIATED');
-      } catch (error) {
-        this.logger.error('Error sending transaction emails:', error);
-        // Don't throw here, just log the error as emails are non-critical
-      }
+      // Update balances for both parties
+      await this.updateSandboxBalances(
+        paymentLink.userId,
+        transaction.id,
+        transactionDto.amount,
+        transactionDto.currency,
+      );
 
-      // Auto-complete with proper delay
-      const delay = isDeal ? 10000 : 5000;
-      setTimeout(async () => {
-        try {
-          await this.completeSandboxTransaction(transaction.id, paymentLink);
-        } catch (error) {
-          this.logger.error('Error completing sandbox transaction:', error);
-        }
-      }, delay);
+      // Increment transaction count in subscription
+      await this.subscriptionService.incrementTransactionCount(
+        paymentLink.userId,
+      );
 
       return {
         id: transaction.id,
@@ -938,50 +973,57 @@ export class PaymentLinkService {
         createdAt: transaction.createdAt,
         expiresAt: transaction.expiresAt,
         escrowAddress,
-        customer: transaction.customerRef ? {  // Change from customer to customerRef
-          email: transaction.customerRef.email,
-          name: transaction.customerRef.name
-        } : undefined,
+        customer: {
+          email: transactionDto.customerEmail,
+          name: transactionDto.customerName,
+        },
         paymentDetails: {
-          ...this.SANDBOX_PAYMENT_METHODS[transactionDto.paymentMethod.toLowerCase()],
-          ...paymentDetails
+          ...this.SANDBOX_PAYMENT_METHODS[
+            transactionDto.paymentMethod.toLowerCase()
+          ],
+          ...paymentDetails,
         },
         data: {
           ...(isDeal && {
             dealStage: 'INITIAL',
             dealType: paymentLink.metadata?.dealType,
             dealTitle: paymentLink.metadata?.dealTitle,
-            requiredDocuments: paymentLink.metadata?.dealStages?.[0]?.requiredDocuments || [],
+            requiredDocuments:
+              paymentLink.metadata?.dealStages?.[0]?.requiredDocuments || [],
             nextSteps: [
               'Review deal terms and conditions',
               'Upload required documents',
               'Complete current stage requirements',
-              'Proceed to next stage upon approval'
-            ]
+              'Proceed to next stage upon approval',
+            ],
           }),
           sandboxPayment: true,
           paymentMethodDetails: {
-            ...this.SANDBOX_PAYMENT_METHODS[transactionDto.paymentMethod.toLowerCase()],
-            ...paymentDetails
-          }
-        }
+            ...this.SANDBOX_PAYMENT_METHODS[
+              transactionDto.paymentMethod.toLowerCase()
+            ],
+            ...paymentDetails,
+          },
+        },
       };
     } catch (error) {
       this.logger.error('Error handling sandbox transaction:', error);
       throw new BadRequestException(
-        error.message || systemResponses.EN.TRANSACTION_INITIATION_FAILED
+        error.message || systemResponses.EN.TRANSACTION_INITIATION_FAILED,
       );
     }
   }
 
   // Update the getCurrentDealStage method to handle the stage type properly
-  private getCurrentDealStage(dealStages: PaymentLinkMetadataType['dealStages']) {
+  private getCurrentDealStage(
+    dealStages: PaymentLinkMetadataType['dealStages'],
+  ) {
     if (!dealStages || dealStages.length === 0) {
       return null;
     }
-    
+
     // Get the first stage by order
-    return dealStages.find(stage => stage.order === 1) || dealStages[0];
+    return dealStages.find((stage) => stage.order === 1) || dealStages[0];
   }
 
   private async completeSandboxTransaction(
@@ -1024,95 +1066,6 @@ export class PaymentLinkService {
       throw new BadRequestException(
         error.message || systemResponses.EN.TRANSACTION_UPDATE_FAILED,
       );
-    }
-  }
-
-  private async generatePaymentLinkMetadata(
-    dto: CreatePaymentLinkDto,
-  ): Promise<PaymentLinkMetadata> {
-    const metadata: PaymentLinkMetadata = {
-      type: dto.type,
-      transactionType: dto.transactionType,
-      defaultAmount: dto.defaultAmount,
-      defaultCurrency: dto.defaultCurrency,
-      isAmountNegotiable: dto.isAmountNegotiable || false,
-      minimumAmount: dto.minimumAmount,
-      maximumAmount: dto.maximumAmount,
-      paymentMethods: dto.paymentMethods.map((method) => ({
-        id: method.methodId,
-        type: method.type,
-        isDefault: method.isDefault || false,
-        details: method.details || {},
-      })),
-    };
-
-    if (dto.escrowConditions) {
-      metadata.escrowConditions = {
-        ...dto.escrowConditions,
-        autoReleaseHours: dto.escrowConditions.timeoutPeriod,
-        arbitrationFee: 0,
-        requiredConfirmations: this.getRequiredConfirmations(
-          dto.defaultCurrency,
-        ),
-      };
-    }
-
-    if (dto.verificationRequirements) {
-      metadata.verificationRequirements = {
-        ...dto.verificationRequirements,
-        allowedFileTypes: ['pdf', 'png', 'jpg', 'docx'],
-        maxFileSize: 5 * 1024 * 1024, // 5MB
-        minimumConfirmations: 1,
-      };
-    }
-
-    if (dto.customerRequirements) {
-      metadata.customerRequirements = {
-        ...dto.customerRequirements,
-        requiredFields: ['email'],
-        kycRequired: false,
-        walletAddressRequired:
-          dto.transactionType === TransactionType.CRYPTOCURRENCY,
-      };
-    }
-
-    if (
-      dto.transactionType === TransactionType.CRYPTOCURRENCY &&
-      dto.cryptocurrencyDetails
-    ) {
-      metadata.cryptocurrencyDetails = {
-        ...dto.cryptocurrencyDetails,
-        requiredConfirmations:
-          dto.cryptocurrencyDetails.requiredConfirmations || 1,
-        acceptedTokens: dto.cryptocurrencyDetails.acceptedTokens || [
-          dto.cryptocurrencyDetails.tokenSymbol,
-        ],
-        networkOptions: dto.cryptocurrencyDetails.networkOptions || [
-          {
-            chainId: dto.cryptocurrencyDetails.chainId,
-            name: dto.cryptocurrencyDetails.network,
-            requiredConfirmations:
-              dto.cryptocurrencyDetails.requiredConfirmations || 1,
-          },
-        ],
-      };
-    }
-
-    return metadata;
-  }
-
-  private getRequiredConfirmations(currency: string): number {
-    switch (currency) {
-      case 'BTC':
-        return 6;
-      case 'ETH':
-        return 12;
-      case 'BNB':
-        return 15;
-      case 'MATIC':
-        return 256;
-      default:
-        return 12; // Default for ERC20/BEP20 tokens
     }
   }
 
@@ -2073,12 +2026,12 @@ export class PaymentLinkService {
         // Ensure nested objects are properly merged
         paymentMethods: {
           ...defaultValue['paymentMethods'],
-          ...(parsed['paymentMethods'] || {})
+          ...(parsed['paymentMethods'] || {}),
         },
         paymentMethodSettings: {
           ...defaultValue['paymentMethodSettings'],
-          ...(parsed['paymentMethodSettings'] || {})
-        }
+          ...(parsed['paymentMethodSettings'] || {}),
+        },
       } as T;
     } catch {
       return defaultValue;
@@ -2138,15 +2091,27 @@ export class PaymentLinkService {
     type: 'INITIATED' | 'COMPLETED' | 'STAGE_UPDATED' | 'DEAL_COMPLETED',
   ) {
     try {
+      // Get customer info from transaction data
+      const customerInfo = transaction.data?.customerInfo || {
+        email: transaction.customerEmail,
+        name: transaction.customerName,
+      };
+
       const buyer = {
-        email: transaction.customer.email,
-        name: transaction.customer.name,
+        email: customerInfo.email,
+        name: customerInfo.name || 'Customer',
       };
 
       const seller = {
-        email: paymentLink.user.email,
-        name: `${paymentLink.user.firstName} ${paymentLink.user.lastName}`,
+        email: paymentLink.user?.email,
+        name:
+          `${paymentLink.user?.firstName || ''} ${paymentLink.user?.lastName || ''}`.trim() ||
+          'Seller',
       };
+
+      if (!buyer.email || !seller.email) {
+        throw new Error('Missing required email information');
+      }
 
       const isDeal = paymentLink.transactionType === TransactionType.DEALS;
       const amount = `${transaction.amount} ${transaction.currency}`;
@@ -2195,8 +2160,7 @@ export class PaymentLinkService {
 
         case 'STAGE_UPDATED':
           const currentStage = transaction.data.dealStage;
-          const stageDetails =
-            this.SANDBOX_DEAL_STAGES.stages[currentStage];
+          const stageDetails = this.SANDBOX_DEAL_STAGES.stages[currentStage];
 
           // Notify both parties
           await Promise.all([
@@ -2314,9 +2278,7 @@ export class PaymentLinkService {
       }
     } catch (error) {
       this.logger.error('Error sending transaction emails:', error);
-      throw new BadRequestException(
-        error.message || systemResponses.EN.EMAIL_SEND_ERROR,
-      );
+      // Don't throw here as email sending is non-critical
     }
   }
 
@@ -2494,30 +2456,34 @@ export class PaymentLinkService {
 
   // Update the transformPaymentMethodsToMetadata method
   private transformPaymentMethodsToMetadata(
-    methods: PaymentMethodDetails[]
+    methods: PaymentMethodDetails[],
   ): PaymentLinkMetadataType['paymentMethods'] {
-    // Create a map of enabled payment methods
-    const enabledMethods = methods.reduce((acc, method) => {
-      acc[method.type.toLowerCase()] = true;
-      return acc;
-    }, {} as Record<string, boolean>);
+    return methods.map((method) => {
+      const type = method.type.toLowerCase();
+      const details: Record<string, any> = {};
 
-    return {
-      card: {
-        testCards: enabledMethods['card'] ? this.SANDBOX_PAYMENT_METHODS.card.testCards : [],
-        instructions: this.SANDBOX_PAYMENT_METHODS.card.instructions
-      },
-      bankTransfer: {
-        testAccounts: enabledMethods['bank_transfer'] ? 
-          this.SANDBOX_PAYMENT_METHODS.bankTransfer.testAccounts : [],
-        instructions: this.SANDBOX_PAYMENT_METHODS.bankTransfer.instructions
-      },
-      cryptocurrency: {
-        testWallets: enabledMethods['cryptocurrency'] ? 
-          this.SANDBOX_PAYMENT_METHODS.cryptocurrency.testWallets : [],
-        instructions: this.SANDBOX_PAYMENT_METHODS.cryptocurrency.instructions
+      switch (type) {
+        case 'card':
+          details.testCards = this.SANDBOX_PAYMENT_METHODS.find(m => m.id === 'card-default')?.details.testCards;
+          details.instructions = this.SANDBOX_PAYMENT_METHODS.find(m => m.id === 'card-default')?.details.instructions;
+          break;
+        case 'bank_transfer':
+          details.testAccounts = this.SANDBOX_PAYMENT_METHODS.find(m => m.id === 'bank-transfer-default')?.details.testAccounts;
+          details.instructions = this.SANDBOX_PAYMENT_METHODS.find(m => m.id === 'bank-transfer-default')?.details.instructions;
+          break;
+        case 'cryptocurrency':
+          details.testWallets = this.SANDBOX_PAYMENT_METHODS.find(m => m.id === 'crypto-default')?.details.testWallets;
+          details.instructions = this.SANDBOX_PAYMENT_METHODS.find(m => m.id === 'crypto-default')?.details.instructions;
+          break;
       }
-    };
+
+      return {
+        id: method.methodId,
+        type: method.type as PaymentMethodType,
+        isDefault: method.isDefault || false,
+        details,
+      };
+    });
   }
 
   // Add the production transaction handler
@@ -2531,6 +2497,237 @@ export class PaymentLinkService {
   // Helper method to get payment method details
   private getSandboxPaymentMethodDetails(methodType: string) {
     const type = methodType.toLowerCase();
-    return this.SANDBOX_PAYMENT_METHODS[type as keyof typeof this.SANDBOX_PAYMENT_METHODS];
+    return this.SANDBOX_PAYMENT_METHODS.find(m => m.id === type);
+  }
+
+  // Add new helper method to update balances
+  private async updateSandboxBalances(
+    sellerId: string,
+    transactionId: string,
+    amount: number,
+    currency: string,
+  ): Promise<void> {
+    try {
+      // Get the transaction with seller info from payment link
+      const transaction = await this.prisma.transaction.findUnique({
+        where: { id: transactionId },
+        include: {
+          paymentLink: {
+            include: {
+              user: true, // Get seller info
+            },
+          },
+        },
+      });
+
+      if (!transaction) {
+        throw new Error('Transaction not found');
+      }
+
+      // Ensure we have the seller from the payment link
+      const seller = transaction.paymentLink?.user;
+      if (!seller) {
+        throw new Error('Seller information not found');
+      }
+
+      // Get or create customer user
+      const customerUser = await this.prisma.user.upsert({
+        where: { email: transaction.customerEmail },
+        update: {
+          name: transaction.customerName,
+        },
+        create: {
+          email: transaction.customerEmail,
+          firstName: transaction.customerName?.split(' ')[0] || 'Customer',
+          lastName: transaction.customerName?.split(' ')[1] || '',
+          password: randomUUID(),
+          country: 'Unknown',
+          organisation: 'Customer',
+          name: transaction.customerName || 'Customer',
+          role: UserRole.DEVELOPER,
+        },
+      });
+
+      // Validate the currency
+      const validCurrency = this.validateCurrency(currency);
+      if (!validCurrency) {
+        throw new Error(`Unsupported currency: ${currency}`);
+      }
+
+      // Create transaction with original currency
+      await this.balanceService.createTransaction({
+        senderId: customerUser.id,
+        recipientId: seller.id,
+        amount: amount,
+        currency: validCurrency,
+        type: 'PAYMENT',
+        note: `Payment received from ${transaction.customerName || 'Customer'} via payment link`,
+      });
+
+      // Handle metadata update
+      const existingMetadata =
+        (transaction.paymentLink.metadata as PaymentLinkMetadata) || {};
+      const updatedMetadata: PaymentLinkMetadata = {
+        ...existingMetadata,
+        completedAt: new Date().toISOString(),
+        completedBy: customerUser.email,
+        finalAmount: amount,
+        finalCurrency: currency,
+      };
+
+      // Update payment link status to COMPLETED
+      await this.prisma.paymentLink.update({
+        where: { id: transaction.paymentLink.id },
+        data: {
+          status: 'COMPLETED',
+          updatedAt: new Date(),
+          metadata: updatedMetadata,
+        },
+      });
+    } catch (error) {
+      this.logger.error('Error updating sandbox balances:', error);
+      // Don't throw here as this is a secondary operation
+    }
+  }
+
+  // Update the validateCurrency method to use the Currency enum from balance.dto
+  private validateCurrency(currency: string): Currency | null {
+    try {
+      const upperCurrency = currency.toUpperCase();
+      if (upperCurrency in Currency) {
+        return Currency[upperCurrency as keyof typeof Currency];
+      }
+      this.logger.warn(`Currency ${currency} not supported, defaulting to USD`);
+      return Currency.USD;
+    } catch {
+      return Currency.USD;
+    }
+  }
+
+  // Add this method to handle payment link status checks
+  async validatePaymentLinkStatus(paymentLinkId: string): Promise<void> {
+    const paymentLink = await this.prisma.paymentLink.findUnique({
+      where: { id: paymentLinkId },
+    });
+
+    if (!paymentLink) {
+      throw new NotFoundException(systemResponses.EN.PAYMENT_LINK_INVALID);
+    }
+
+    if (paymentLink.status !== 'ACTIVE') {
+      throw new BadRequestException(
+        paymentLink.status === 'COMPLETED'
+          ? systemResponses.EN.PAYMENT_LINK_ALREADY_USED
+          : systemResponses.EN.PAYMENT_LINK_INACTIVE,
+      );
+    }
+  }
+
+  async getPaymentLinks(
+    userId: string,
+    page = 1,
+    limit = 10,
+    status?: string,
+    type?: string,
+  ): Promise<{
+    links: any[];
+    total: number;
+    page: number;
+    totalPages: number;
+  }> {
+    try {
+      const skip = (page - 1) * limit;
+
+      // Build where clause
+      const where: Prisma.PaymentLinkWhereInput = {
+        userId,
+        // Remove status filter to get all payment links
+        ...(type && { type }),
+      };
+
+      // Get total count
+      const total = await this.prisma.paymentLink.count({ where });
+
+      // Get payment links with pagination
+      const links = await this.prisma.paymentLink.findMany({
+        where,
+        include: {
+          paymentLinkMethods: true,
+          transactions: {
+            select: {
+              id: true,
+              amount: true,
+              currency: true,
+              status: true,
+              createdAt: true,
+              customerEmail: true,
+              customerName: true,
+            },
+          },
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
+              email: true,
+            },
+          },
+        },
+        orderBy: {
+          createdAt: 'desc',
+        },
+        skip,
+        take: limit,
+      });
+
+      // Add status-based statistics to each link
+      const enrichedLinks = links.map(link => ({
+        ...link,
+        statistics: {
+          total: link.transactions.length,
+          completed: link.transactions.filter(t => t.status === 'COMPLETED').length,
+          pending: link.transactions.filter(t => t.status === 'PENDING').length,
+          failed: link.transactions.filter(t => t.status === 'FAILED').length,
+        },
+        // Add a human-readable status description
+        statusDescription: this.getStatusDescription(link.status),
+        // Add color code for UI
+        statusColor: this.getStatusColor(link.status),
+      }));
+
+      return {
+        links: enrichedLinks,
+        total,
+        page,
+        totalPages: Math.ceil(total / limit),
+      };
+    } catch (error) {
+      this.logger.error('Error fetching payment links:', error);
+      throw new BadRequestException(
+        error.message || systemResponses.EN.PAYMENT_LINK_FETCH_FAILED,
+      );
+    }
+  }
+
+  // Add helper methods for status information
+  private getStatusDescription(status: string): string {
+    const statusMap: Record<string, string> = {
+      'ACTIVE': 'Payment link is active and can be used',
+      'COMPLETED': 'Payment has been received and processed',
+      'DELETED': 'Payment link has been deleted',
+      'EXPIRED': 'Payment link has expired',
+      'SUSPENDED': 'Payment link has been temporarily suspended',
+    };
+    return statusMap[status] || status;
+  }
+
+  private getStatusColor(status: string): string {
+    const colorMap: Record<string, string> = {
+      'ACTIVE': 'green',
+      'COMPLETED': 'blue',
+      'DELETED': 'red',
+      'EXPIRED': 'orange',
+      'SUSPENDED': 'yellow',
+    };
+    return colorMap[status] || 'grey';
   }
 }

@@ -1346,7 +1346,7 @@
                           "email": "customer@example.com",
                           "name": "John Doe"
                         },
-                        "createdAt": "2024-12-18T19:14:11.035Z",
+                        "createdAt": "2024-12-19T12:57:42.602Z",
                         "escrowAddress": null,
                         "paymentMethod": null,
                         "expiresAt": null
@@ -2465,7 +2465,11 @@
               "NGN",
               "USD",
               "EUR",
-              "ESP"
+              "ESP",
+              "BTC",
+              "ETH",
+              "USDT",
+              "USDC"
             ],
             "example": "USD",
             "description": "Currency for FIAT transfers"
@@ -2491,7 +2495,11 @@
               "NGN",
               "USD",
               "EUR",
-              "ESP"
+              "ESP",
+              "BTC",
+              "ETH",
+              "USDT",
+              "USDC"
             ],
             "example": "USD",
             "description": "Currency for payment request (FIAT or CRYPTO)"

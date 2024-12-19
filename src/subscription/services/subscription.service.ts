@@ -173,4 +173,49 @@ export class SubscriptionService {
       },
     });
   }
+
+  async incrementTransactionCount(userId: string): Promise<boolean> {
+    const subscription = await this.prisma.subscription.findUnique({
+      where: { userId },
+      include: { usage: true },
+    });
+
+    if (!subscription) {
+      await this.prisma.subscription.create({
+        data: {
+          userId,
+          planType: PlanType.STARTER,
+          usage: {
+            create: {
+              monthlyTransactions: 1,
+            },
+          },
+        },
+      });
+      return true;
+    }
+
+    if (this.shouldResetUsage(subscription.usage?.lastResetDate)) {
+      await this.resetMonthlyUsage(subscription.id);
+      return true;
+    }
+
+    const transactionLimit = this.getTransactionLimit(subscription.planType as PlanType);
+    const currentCount = subscription.usage?.monthlyTransactions || 0;
+
+    if (currentCount >= transactionLimit) {
+      return false;
+    }
+
+    await this.prisma.subscriptionUsage.update({
+      where: { subscriptionId: subscription.id },
+      data: {
+        monthlyTransactions: {
+          increment: 1,
+        },
+      },
+    });
+
+    return true;
+  }
 } 

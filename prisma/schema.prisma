@@ -51,6 +51,7 @@ model User {
   cryptoReservations   CryptoBalanceReservation[]
   custodialWallets     CustodialWallet[]
   stripeAccount        StripeAccount?
+  notifications        Notification[]
 
   @@map("users")
 }
@@ -484,4 +485,20 @@ model Customer {
   updatedAt     DateTime      @updatedAt
 
   @@map("customers")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  data      Json?
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
 }

@@ -520,5 +520,7 @@ export const systemResponses = {
     SANDBOX_MODE_DEFAULT_PAYMENT_METHOD: 'This is a sandbox payment link',
     SANDBOX_MODE_PAYMENT_METHOD_SETTINGS: 'This is a sandbox payment link',
     PAYMENT_LINK_ALREADY_USED: 'This payment link has already been used and cannot be used again',
+
+    NOTIFICATIONS_MARKED_READ: 'All notifications have been marked as read',
   },
 };

@@ -1346,7 +1346,7 @@
                           "email": "customer@example.com",
                           "name": "John Doe"
                         },
-                        "createdAt": "2024-12-19T12:57:42.602Z",
+                        "createdAt": "2024-12-19T15:46:59.627Z",
                         "escrowAddress": null,
                         "paymentMethod": null,
                         "expiresAt": null
@@ -2263,6 +2263,74 @@
         "summary": "End chat session",
         "tags": [
           "support"
+        ]
+      }
+    },
+    "/notifications": {
+      "get": {
+        "operationId": "NotificationsController_getNotifications",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "List of notifications retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "notifications": [
+                      {
+                        "id": "notif_123",
+                        "type": "PAYMENT_RECEIVED",
+                        "title": "New payment received",
+                        "message": "You have received a new payment of $100",
+                        "read": false,
+                        "createdAt": "2024-03-21T10:00:00Z"
+                      }
+                    ],
+                    "unreadCount": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user notifications",
+        "tags": [
+          "notifications"
+        ]
+      }
+    },
+    "/notifications/mark-all-read": {
+      "put": {
+        "operationId": "NotificationsController_markAllAsRead",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "All notifications marked as read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "All notifications marked as read"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Mark all notifications as read",
+        "tags": [
+          "notifications"
         ]
       }
     }

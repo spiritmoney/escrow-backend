@@ -23,6 +23,7 @@ import { ProfileController } from './profile/controllers/profile.controller';
 import { SupportController } from './support/controllers/support.controller';
 import { LiveChatController } from './support/controllers/live-chat.controller';
 import { WebhookController } from './payment-link/controllers/webhook.controller';
+import { NotificationsController } from './notifications/controllers/notifications.controller';
 
 // Services and Providers
 import { PrismaService } from './prisma/prisma.service';
@@ -53,6 +54,7 @@ import { CombinedAuthGuard } from './auth/guards/combined-auth.guard';
 import { SupportService } from './support/services/support.service';
 import { LiveChatService } from './support/services/live-chat.service';
 import { StripeService } from './services/stripe/stripe.service';
+import { NotificationsService } from './notifications/services/notifications.service';
 
 // Wallet Services
 import { BitcoinWalletService } from './wallet/services/bitcoin-wallet.service';
@@ -122,6 +124,7 @@ const CloudinaryProvider = {
     ProfileController,
     SupportController,
     LiveChatController,
+    NotificationsController,
   ],
   providers: [
     // Core Services
@@ -187,6 +190,7 @@ const CloudinaryProvider = {
     
     // Stripe Services
     StripeService,
+    NotificationsService,
   ],
   exports: [
     MultiChainWalletService,

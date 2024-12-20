@@ -16,8 +16,9 @@ async function bootstrap() {
     origin: [
       'http://localhost:3000',      // Local development
       'http://localhost:5173',      // Vite default
-      'https://espeespay.vercel.app', // Production frontend
-      /\.vercel\.app$/,            // Any Vercel deployment
+      'https://paylinc.org', // Production frontend
+      'https://www.paylinc.org', // Production frontend
+      'https://paylinc.vercel.app', // Production frontend
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,

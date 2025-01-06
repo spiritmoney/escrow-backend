@@ -162,6 +162,8 @@ export const systemResponses = {
 
     BLOCKCHAIN_ERROR: 'Blockchain transaction failed',
 
+    CRYPTO_TRANSFER_SUCCESS: 'Cryptocurrency transfer successful',
+
     // Transaction Related
 
     TRANSACTIONS_NOT_FOUND: 'No transactions found',

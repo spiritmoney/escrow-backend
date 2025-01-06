@@ -14,15 +14,21 @@ async function bootstrap() {
   // CORS Configuration
   app.enableCors({
     origin: [
-      'http://localhost:3000',      // Local development
-      'http://localhost:5173',      // Vite default
+      'http://localhost:3000', // Local development
+      'http://localhost:5173', // Vite default
       'https://paylinc.org', // Production frontend
       'https://www.paylinc.org', // Production frontend
       'https://paylinc.vercel.app', // Production frontend
+      'https://escrow-pay.vercel.app', // Production frontend
     ],
     methods: 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS',
     credentials: true,
-    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'x-api-key'],
+    allowedHeaders: [
+      'Content-Type',
+      'Authorization',
+      'X-Requested-With',
+      'x-api-key',
+    ],
   });
   
   // Swagger Configuration

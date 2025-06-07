@@ -52,8 +52,14 @@ export interface RegisterResponse {
     isVerified: boolean;
     createdAt: Date;
   };
-  wallets: UserWallet[];
   apiKey: string;
+  wallets?: {
+    custodial: {
+      created: boolean;
+      count: number;
+      networks: string[];
+    };
+  };
   message: string;
 }
 
@@ -79,4 +85,4 @@ export interface ResetPasswordDto extends VerifyOtpDto {
 
 export interface RequestPasswordResetDto {
   email: string;
-} 
+}

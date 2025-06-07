@@ -1,4 +1,5 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import {
   IAuthService,
@@ -18,25 +19,21 @@ import { systemResponses } from '../../contracts/system.responses';
 import * as bcrypt from 'bcrypt';
 import { generateApiKey } from '../../utils/api-key.util';
 import { PrismaService } from '../../prisma/prisma.service';
-import { MultiChainWalletService } from '../../wallet/services/multi-chain-wallet.service';
 import { UserRole } from '../../contracts/roles.contract';
-import { SUPPORTED_CRYPTOCURRENCIES } from '../../wallet/constants/crypto.constants';
-import { SUPPORTED_NETWORKS } from '../../wallet/constants/crypto.constants';
-import {
-  NetworkConfig,
-  TokenDetails,
-} from '../../wallet/interfaces/chain-wallet.interface';
+
 import * as speakeasy from 'speakeasy';
 import * as QRCode from 'qrcode';
 
 @Injectable()
 export class AuthService implements IAuthService {
+  private readonly logger = new Logger(AuthService.name);
+
   constructor(
     private userRepository: UserRepository,
     private jwtService: JwtService,
-    private multiChainWalletService: MultiChainWalletService,
     private emailService: NodemailerService,
     private prisma: PrismaService,
+    private configService: ConfigService,
   ) {}
 
   private generateOTP(): string {
@@ -255,7 +252,9 @@ export class AuthService implements IAuthService {
   async register(registerDto: RegisterDto): Promise<RegisterResponse> {
     try {
       // Check for existing user
-      const existingUser = await this.userRepository.findByEmail(registerDto.email);
+      const existingUser = await this.userRepository.findByEmail(
+        registerDto.email,
+      );
       if (existingUser) {
         throw new BadRequestException(systemResponses.EN.USER_EMAIL_EXISTS);
       }
@@ -284,8 +283,7 @@ export class AuthService implements IAuthService {
             data: {
               userId: user.id,
               apiKey,
-              apiAccess: true,
-              webhookNotifications: false,
+              isActive: true,
             },
           });
 
@@ -305,38 +303,14 @@ export class AuthService implements IAuthService {
         {
           timeout: 30000, // Increased to 30 seconds
           maxWait: 10000,
-        }
+        },
       );
 
-      // Create wallets in a separate transaction
-      await this.prisma.$transaction(
-        async (prisma) => {
-          // Create multi-chain wallets
-          await this.multiChainWalletService.createUserWallets(newUser.user.id);
-          // Create custodial wallets
-          await this.createCustodialWallets(newUser.user.id, prisma);
-        },
-        {
-          timeout: 30000, // Increased to 30 seconds
-          maxWait: 10000,
-        }
-      );
+      // Create basic custodial wallets for crypto support
+      await this.createCustodialWallets(newUser.user.id);
 
       // Send verification email
       await this.sendVerificationEmail(registerDto.email, otp);
-
-      // Return response with wallets
-      const wallets = await this.prisma.wallet.findMany({
-        where: { userId: newUser.user.id },
-        select: {
-          address: true,
-          encryptedPrivateKey: true,
-          iv: true,
-          network: true,
-          type: true,
-          chainId: true,
-        },
-      });
 
       // Map user data excluding sensitive information
       const mappedUserData = {
@@ -352,8 +326,14 @@ export class AuthService implements IAuthService {
 
       return {
         user: mappedUserData,
-        wallets: wallets as UserWallet[],
         apiKey: newUser.apiKey,
+        wallets: {
+          custodial: {
+            created: true,
+            count: 3, // USDC, USDT, ESPEES
+            networks: ['Circles'],
+          },
+        },
         message: systemResponses.EN.USER_CREATED,
       };
     } catch (error) {
@@ -373,37 +353,33 @@ export class AuthService implements IAuthService {
     }
   }
 
-  private async createCustodialWallets(userId: string, prisma: any) {
-    const supportedTokens: Record<string, TokenDetails> = SUPPORTED_CRYPTOCURRENCIES;
-    const supportedNetworks: Record<string, NetworkConfig> = SUPPORTED_NETWORKS;
+  private async createCustodialWallets(userId: string) {
+    // Create custodial wallets for the three supported crypto currencies
+    const supportedCurrencies = [
+      { currency: 'USDC', network: 'Circles' },
+      { currency: 'USDT', network: 'Circles' },
+      { currency: 'ESPEES', network: 'Circles' },
+    ];
 
-    for (const [networkKey, network] of Object.entries(supportedNetworks)) {
-      if (!network.tokens || !Array.isArray(network.tokens)) continue;
-
-      for (const token of network.tokens) {
-        const tokenDetails = supportedTokens[token];
-        if (!tokenDetails) continue;
-
-        await prisma.custodialWallet.upsert({
-          where: {
-            userId_token_chainId: {
-              userId,
-              token,
-              chainId: network.chainId || 1,
-            }
-          },
-          update: {}, // No updates if it exists
-          create: {
+    for (const { currency, network } of supportedCurrencies) {
+      await this.prisma.custodialWallet.upsert({
+        where: {
+          userId_currency_network: {
             userId,
-            token,
-            chainId: network.chainId || 1,
-            balance: '0',
-            status: 'ACTIVE',
-            network: network.name || networkKey,
-            tokenDecimals: tokenDetails.decimals || 18,
+            currency,
+            network,
           },
-        });
-      }
+        },
+        update: {}, // No updates if it exists
+        create: {
+          userId,
+          currency,
+          network,
+          address: `${currency.toLowerCase()}_${userId}_wallet`,
+          balance: 0,
+          isActive: true,
+        },
+      });
     }
   }
 

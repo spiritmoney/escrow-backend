@@ -1,12 +1,30 @@
-import { Controller, Get, Post, Param, Body, UseGuards, NotFoundException, BadRequestException, Inject } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiParam, ApiBody, ApiBearerAuth, ApiSecurity } from '@nestjs/swagger';
+import {
+  Controller,
+  Get,
+  Post,
+  Param,
+  Body,
+  UseGuards,
+  NotFoundException,
+  BadRequestException,
+  Inject,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBody,
+  ApiBearerAuth,
+  ApiSecurity,
+} from '@nestjs/swagger';
 import { PaymentRequestService } from '../services/payment-request.service';
 import { BalanceService } from '../../balance/services/balance.service';
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { systemResponses } from '../../contracts/system.responses';
 import { PrismaService } from '../../prisma/prisma.service';
 import { NodemailerService } from '../../services/nodemailer/NodemailerService';
-import { AssetType, Currency } from '../../balance/dto/balance.dto';
+import { AssetType, SupportedCurrencies } from '../../balance/dto/balance.dto';
 import { CombinedAuthGuard } from '../../auth/guards/combined-auth.guard';
 
 @ApiTags('payments')
@@ -27,7 +45,7 @@ export class PaymentController {
   @ApiParam({
     name: 'requestId',
     description: 'ID of the payment request',
-    type: String
+    type: String,
   })
   @ApiResponse({
     status: 200,
@@ -36,27 +54,33 @@ export class PaymentController {
       example: {
         paymentRequest: {
           id: 'abc123',
-          amount: 1000.00,
+          amount: 1000.0,
           currency: 'USD',
           description: 'Payment for services',
           status: 'PENDING',
           requester: {
             firstName: 'John',
             lastName: 'Doe',
-            organisation: 'Acme Corp'
-          }
+            organisation: 'Acme Corp',
+          },
         },
         pageData: {
           title: 'Payment to John Doe',
-          amount: 1000.00,
+          amount: 1000.0,
           currency: 'USD',
-          description: 'Payment for services'
-        }
-      }
-    }
+          description: 'Payment for services',
+        },
+      },
+    },
   })
-  @ApiResponse({ status: 404, description: systemResponses.EN.PAYMENT_NOT_FOUND })
-  @ApiResponse({ status: 400, description: systemResponses.EN.PAYMENT_ALREADY_PROCESSED })
+  @ApiResponse({
+    status: 404,
+    description: systemResponses.EN.PAYMENT_NOT_FOUND,
+  })
+  @ApiResponse({
+    status: 400,
+    description: systemResponses.EN.PAYMENT_ALREADY_PROCESSED,
+  })
   async getPaymentPage(@Param('requestId') requestId: string) {
     try {
       const paymentRequest = await this.prisma.paymentRequest.findUnique({
@@ -77,7 +101,9 @@ export class PaymentController {
       }
 
       if (paymentRequest.status !== 'PENDING') {
-        throw new BadRequestException(systemResponses.EN.PAYMENT_ALREADY_PROCESSED);
+        throw new BadRequestException(
+          systemResponses.EN.PAYMENT_ALREADY_PROCESSED,
+        );
       }
 
       return {
@@ -90,7 +116,10 @@ export class PaymentController {
         },
       };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       throw new BadRequestException(systemResponses.EN.INTERNAL_SERVER_ERROR);
@@ -103,28 +132,40 @@ export class PaymentController {
   @ApiParam({
     name: 'requestId',
     description: 'ID of the payment request to process',
-    type: String
+    type: String,
   })
   @ApiBody({
     schema: {
       example: {
         userId: 'user123',
-      }
-    }
+      },
+    },
   })
   @ApiResponse({
     status: 200,
     description: systemResponses.EN.PAYMENT_PROCESSED,
     schema: {
       example: {
-        message: systemResponses.EN.PAYMENT_PROCESSED
-      }
-    }
+        message: systemResponses.EN.PAYMENT_PROCESSED,
+      },
+    },
   })
-  @ApiResponse({ status: 401, description: systemResponses.EN.AUTHENTICATION_FAILED })
-  @ApiResponse({ status: 404, description: systemResponses.EN.PAYMENT_NOT_FOUND })
-  @ApiResponse({ status: 400, description: systemResponses.EN.PAYMENT_ALREADY_PROCESSED })
-  @ApiResponse({ status: 422, description: systemResponses.EN.INSUFFICIENT_BALANCE })
+  @ApiResponse({
+    status: 401,
+    description: systemResponses.EN.AUTHENTICATION_FAILED,
+  })
+  @ApiResponse({
+    status: 404,
+    description: systemResponses.EN.PAYMENT_NOT_FOUND,
+  })
+  @ApiResponse({
+    status: 400,
+    description: systemResponses.EN.PAYMENT_ALREADY_PROCESSED,
+  })
+  @ApiResponse({
+    status: 422,
+    description: systemResponses.EN.INSUFFICIENT_BALANCE,
+  })
   async processPayment(
     @Param('requestId') requestId: string,
     @Body() paymentDetails: any,
@@ -140,22 +181,27 @@ export class PaymentController {
       }
 
       if (paymentRequest.status !== 'PENDING') {
-        throw new BadRequestException(systemResponses.EN.PAYMENT_ALREADY_PROCESSED);
+        throw new BadRequestException(
+          systemResponses.EN.PAYMENT_ALREADY_PROCESSED,
+        );
       }
 
-      // Validate and convert currency to FiatCurrency enum
-      if (!Object.values(Currency).includes(paymentRequest.currency as Currency)) {
+      // Validate and convert currency to SupportedCurrencies enum
+      if (
+        !Object.values(SupportedCurrencies).includes(
+          paymentRequest.currency as SupportedCurrencies,
+        )
+      ) {
         throw new BadRequestException(systemResponses.EN.INVALID_CURRENCY);
       }
 
       // Process the payment using BalanceService
-      await this.balanceService.sendMoney(paymentDetails.userId, {
-        assetType: AssetType.FIAT,
-        recipientAddress: paymentRequest.requester.email,
-        amount: paymentRequest.amount,
-        currency: paymentRequest.currency as Currency,
-        note: `Payment for request: ${paymentRequest.description}`,
-      });
+      await this.balanceService.updateBalance(
+        paymentRequest.requesterId,
+        paymentRequest.currency as SupportedCurrencies,
+        paymentRequest.amount,
+        'ADD',
+      );
 
       // Update payment request status
       await this.prisma.paymentRequest.update({
@@ -168,7 +214,10 @@ export class PaymentController {
 
       return { message: systemResponses.EN.PAYMENT_PROCESSED };
     } catch (error) {
-      if (error instanceof NotFoundException || error instanceof BadRequestException) {
+      if (
+        error instanceof NotFoundException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
       if (error.message.includes('balance')) {
@@ -203,4 +252,4 @@ export class PaymentController {
       throw new BadRequestException(systemResponses.EN.EMAIL_SEND_ERROR);
     }
   }
-} 
+}

@@ -23,10 +23,8 @@ export class ApiKeyAuthGuard implements CanActivate {
     const apiSettings = await this.prisma.apiSettings.findFirst({
       where: {
         apiKey,
-
-        apiAccess: true,
+        isActive: true,
       },
-
       include: {
         user: true,
       },
@@ -36,12 +34,11 @@ export class ApiKeyAuthGuard implements CanActivate {
       throw new UnauthorizedException(systemResponses.EN.API_KEY_INVALID);
     }
 
-    if (!apiSettings.apiAccess) {
+    if (!apiSettings.isActive) {
       throw new UnauthorizedException(systemResponses.EN.API_ACCESS_DISABLED);
     }
 
     // Attach user to request
-
     request.user = apiSettings.user;
 
     return true;

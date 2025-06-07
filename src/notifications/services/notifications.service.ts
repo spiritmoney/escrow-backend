@@ -8,7 +8,7 @@ import { systemResponses } from '../../contracts/system.responses';
 export class NotificationsService {
   constructor(
     private prisma: PrismaService,
-    private eventEmitter: EventEmitter2
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async getUserNotifications(userId: string) {
@@ -17,21 +17,21 @@ export class NotificationsService {
         userId,
       },
       orderBy: {
-        createdAt: 'desc'
+        createdAt: 'desc',
       },
-      take: 50 // Limit to most recent 50 notifications
+      take: 50, // Limit to most recent 50 notifications
     });
 
     const unreadCount = await this.prisma.notification.count({
       where: {
         userId,
-        read: false
-      }
+        read: false,
+      },
     });
 
     return {
       notifications,
-      unreadCount
+      unreadCount,
     };
   }
 
@@ -39,15 +39,15 @@ export class NotificationsService {
     await this.prisma.notification.updateMany({
       where: {
         userId,
-        read: false
+        read: false,
       },
       data: {
-        read: true
-      }
+        read: true,
+      },
     });
 
     return {
-      message: systemResponses.EN.NOTIFICATIONS_MARKED_READ
+      message: systemResponses.EN.NOTIFICATIONS_MARKED_READ,
     };
   }
 
@@ -58,9 +58,8 @@ export class NotificationsService {
         type,
         title: this.getNotificationTitle(type),
         message: this.generateMessage(type, data),
-        data,
-        read: false
-      }
+        read: false,
+      },
     });
 
     // Emit event for real-time updates
@@ -91,4 +90,4 @@ export class NotificationsService {
         return 'You have a new notification';
     }
   }
-} 
+}

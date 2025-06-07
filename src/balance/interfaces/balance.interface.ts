@@ -1,5 +1,3 @@
-import { AssetType, Currency } from '../dto/balance.dto';
-
 export interface FiatBalances {
   NGN: number;
   USD: number;
@@ -22,4 +20,4 @@ export interface IBalanceService {
   getBalances(userId: string): Promise<UserBalances>;
   sendMoney(userId: string, transferDetails: any): Promise<any>;
   requestPayment(userId: string, requestDetails: any): Promise<any>;
-} 
+}

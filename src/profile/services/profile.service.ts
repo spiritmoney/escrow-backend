@@ -1,11 +1,19 @@
-import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+} from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ConfigService } from '@nestjs/config';
 import { UserRepository } from '../../auth/repositories/user.repository';
 import { HashingService } from '../../auth/services/hashing.service';
 import { CloudinaryService } from '../../services/cloudinary/cloudinary.service';
 import { systemResponses } from '../../contracts/system.responses';
-import { UpdateProfileDto, UpdateSecuritySettingsDto, ApiSettingsDto } from '../dto/profile.dto';
+import {
+  UpdateProfileDto,
+  UpdateSecuritySettingsDto,
+  ApiSettingsDto,
+} from '../dto/profile.dto';
 import { generateApiKey } from '../../utils/api-key.util';
 
 @Injectable()
@@ -38,12 +46,12 @@ export class ProfileService {
       phone: user.phone,
       photoUrl: user.photoUrl,
       organisation: user.organisation,
-      kycLevel: user.kycVerification?.level || 'Level 1',
-      transactionLimit: this.formatTransactionLimit(user.kycVerification?.transactionLimit),
+      kycLevel: user.kycVerification?.status || 'PENDING',
+      transactionLimit: this.formatTransactionLimit(1000), // Default limit
       apiKey: user.apiSettings?.apiKey || null,
       twoFactorEnabled: user.twoFactorEnabled,
-      apiAccess: user.apiSettings?.apiAccess || false,
-      webhookNotifications: user.apiSettings?.webhookNotifications || false,
+      apiAccess: user.apiSettings?.isActive || false,
+      webhookNotifications: false, // Not stored in database
     };
   }
 
@@ -57,9 +65,9 @@ export class ProfileService {
         },
       });
 
-      return { 
+      return {
         message: systemResponses.EN.PROFILE_UPDATED,
-        user: await this.getProfile(userId)
+        user: await this.getProfile(userId),
       };
     } catch (error) {
       throw new BadRequestException(systemResponses.EN.PROFILE_UPDATE_ERROR);
@@ -70,7 +78,7 @@ export class ProfileService {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { photoUrl: true }
+        select: { photoUrl: true },
       });
 
       if (user?.photoUrl) {
@@ -80,22 +88,25 @@ export class ProfileService {
         }
       }
 
-      const uploadResult = await this.cloudinaryService.uploadFile(file, 'profile-photos');
-      
+      const uploadResult = await this.cloudinaryService.uploadFile(
+        file,
+        'profile-photos',
+      );
+
       await this.prisma.user.update({
         where: { id: userId },
         data: {
-          photoUrl: uploadResult.url
-        }
+          photoUrl: uploadResult.url,
+        },
       });
 
       return {
         message: systemResponses.EN.PHOTO_UPDATED,
-        photoUrl: uploadResult.url
+        photoUrl: uploadResult.url,
       };
     } catch (error) {
       throw new BadRequestException(
-        error.message || systemResponses.EN.PHOTO_UPDATE_FAILED
+        error.message || systemResponses.EN.PHOTO_UPDATE_FAILED,
       );
     }
   }
@@ -104,7 +115,7 @@ export class ProfileService {
     try {
       const user = await this.prisma.user.findUnique({
         where: { id: userId },
-        select: { photoUrl: true }
+        select: { photoUrl: true },
       });
 
       if (!user?.photoUrl) {
@@ -124,20 +135,18 @@ export class ProfileService {
       await this.prisma.user.update({
         where: { id: userId },
         data: {
-          photoUrl: null
-        }
+          photoUrl: null,
+        },
       });
 
       return {
-        message: systemResponses.EN.PHOTO_DELETED
+        message: systemResponses.EN.PHOTO_DELETED,
       };
     } catch (error) {
       if (error instanceof BadRequestException) {
         throw error;
       }
-      throw new BadRequestException(
-        systemResponses.EN.PHOTO_DELETE_FAILED
-      );
+      throw new BadRequestException(systemResponses.EN.PHOTO_DELETE_FAILED);
     }
   }
 
@@ -163,15 +172,15 @@ export class ProfileService {
   async regenerateApiKey(userId: string) {
     try {
       const newApiKey = generateApiKey();
-      
+
       await this.prisma.apiSettings.update({
         where: { userId },
-        data: { apiKey: newApiKey }
+        data: { apiKey: newApiKey },
       });
 
       return {
         message: systemResponses.EN.API_KEY_REGENERATED,
-        apiKey: newApiKey
+        apiKey: newApiKey,
       };
     } catch (error) {
       throw new BadRequestException(systemResponses.EN.API_KEY_UPDATE_ERROR);
@@ -183,23 +192,25 @@ export class ProfileService {
       await this.prisma.apiSettings.update({
         where: { userId },
         data: {
-          apiAccess: apiSettingsDto.apiAccess,
-          webhookNotifications: apiSettingsDto.webhookNotifications
-        }
+          isActive: apiSettingsDto.apiAccess,
+          // webhookNotifications field doesn't exist in database model
+        },
       });
 
       return {
-        message: systemResponses.EN.API_SETTINGS_UPDATED
+        message: systemResponses.EN.API_SETTINGS_UPDATED,
       };
     } catch (error) {
-      throw new BadRequestException(systemResponses.EN.API_SETTINGS_UPDATE_FAILED);
+      throw new BadRequestException(
+        systemResponses.EN.API_SETTINGS_UPDATE_FAILED,
+      );
     }
   }
 
   async getKycStatus(userId: string) {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      include: { kycVerification: true }
+      include: { kycVerification: true },
     });
 
     if (!user) {
@@ -207,40 +218,50 @@ export class ProfileService {
     }
 
     return {
-      currentLevel: user.kycVerification?.level || 'Level 1',
-      transactionLimit: this.formatTransactionLimit(user.kycVerification?.transactionLimit),
-      verificationRequired: !user.kycVerification || user.kycVerification.level === 'Level 1'
+      currentLevel: user.kycVerification?.status || 'PENDING',
+      transactionLimit: this.formatTransactionLimit(1000), // Default limit
+      verificationRequired:
+        !user.kycVerification || user.kycVerification.status === 'PENDING',
     };
   }
 
-  async updateSecuritySettings(userId: string, securitySettingsDto: UpdateSecuritySettingsDto) {
+  async updateSecuritySettings(
+    userId: string,
+    securitySettingsDto: UpdateSecuritySettingsDto,
+  ) {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
-    
+
     if (!user) {
       throw new BadRequestException(systemResponses.EN.USER_NOT_FOUND);
     }
 
     const isCurrentPasswordValid = await this.hashingService.compare(
       securitySettingsDto.currentPassword,
-      user.password
+      user.password,
     );
 
     if (!isCurrentPasswordValid) {
-      throw new BadRequestException(systemResponses.EN.CURRENT_PASSWORD_INCORRECT);
+      throw new BadRequestException(
+        systemResponses.EN.CURRENT_PASSWORD_INCORRECT,
+      );
     }
 
-    if (securitySettingsDto.newPassword !== securitySettingsDto.confirmNewPassword) {
+    if (
+      securitySettingsDto.newPassword !== securitySettingsDto.confirmNewPassword
+    ) {
       throw new BadRequestException(systemResponses.EN.PASSWORDS_DO_NOT_MATCH);
     }
 
-    const hashedPassword = await this.hashingService.hash(securitySettingsDto.newPassword);
+    const hashedPassword = await this.hashingService.hash(
+      securitySettingsDto.newPassword,
+    );
 
     await this.prisma.user.update({
       where: { id: userId },
       data: {
         password: hashedPassword,
-        twoFactorEnabled: securitySettingsDto.twoFactorEnabled
-      }
+        twoFactorEnabled: securitySettingsDto.twoFactorEnabled,
+      },
     });
 
     return { message: systemResponses.EN.SECURITY_SETTINGS_UPDATED };
@@ -248,4 +269,4 @@ export class ProfileService {
 
   // Add other service methods for security settings, API settings, etc.
   // ...
-} 
+}

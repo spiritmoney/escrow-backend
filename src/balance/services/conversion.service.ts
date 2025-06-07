@@ -1,6 +1,5 @@
 import { Injectable, BadRequestException, UnauthorizedException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { Currency } from '../dto/balance.dto';
 import { systemResponses } from '../../contracts/system.responses';
 import { ConfigService } from '@nestjs/config';
 import { Logger } from '@nestjs/common';

@@ -1,52 +1,44 @@
-import { IsString, IsNumber, IsEnum } from 'class-validator';
+import { IsNumber, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
-import { Currency } from './balance.dto';
+
+export enum SupportedCurrencies {
+  USD = 'USD',
+  GBP = 'GBP',
+  EUR = 'EUR',
+  NGN = 'NGN',
+  USDC = 'USDC',
+  USDT = 'USDT',
+  ESPEES = 'ESPEES',
+}
 
 export class ConvertCurrencyDto {
   @ApiProperty({
-    example: 'ESP',
-    description: 'Currency to convert from'
-  })
-  @IsString()
-  from: string;
-
-  @ApiProperty({
-    example: 'USD',
-    description: 'Currency to convert to'
-  })
-  @IsString()
-  to: string;
-
-  @ApiProperty({
-    example: 1000,
-    description: 'Amount to convert'
+    description: 'Amount to convert',
+    example: 100,
   })
   @IsNumber()
   amount: number;
+
+  @ApiProperty({
+    enum: SupportedCurrencies,
+    description: 'Source currency',
+    example: SupportedCurrencies.USD,
+  })
+  @IsEnum(SupportedCurrencies)
+  from: SupportedCurrencies;
+
+  @ApiProperty({
+    enum: SupportedCurrencies,
+    description: 'Target currency',
+    example: SupportedCurrencies.EUR,
+  })
+  @IsEnum(SupportedCurrencies)
+  to: SupportedCurrencies;
 }
 
-export class ConversionResponse {
-  @ApiProperty({
-    example: 1800,
-    description: 'Converted amount'
-  })
+export interface ConversionResponse {
   convertedAmount: number;
-
-  @ApiProperty({
-    example: 1800,
-    description: 'Conversion rate'
-  })
   rate: number;
-
-  @ApiProperty({
-    example: 'ESP',
-    description: 'Source currency'
-  })
-  from: string;
-
-  @ApiProperty({
-    example: 'NGN',
-    description: 'Target currency'
-  })
-  to: string;
-} 
+  from: SupportedCurrencies;
+  to: SupportedCurrencies;
+}

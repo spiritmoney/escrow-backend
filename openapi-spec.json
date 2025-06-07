@@ -29,14 +29,30 @@
                       "lastName": "Doe",
                       "organisation": "Acme Corp",
                       "role": "DEVELOPER",
-                      "walletAddress": "0x..."
+                      "isVerified": false,
+                      "createdAt": "2024-01-01T00:00:00.000Z"
                     },
-                    "wallet": {
-                      "address": "0x...",
-                      "encryptedPrivateKey": "...",
-                      "iv": "..."
+                    "apiKey": "esp_1234567890abcdef...",
+                    "wallets": {
+                      "custodial": {
+                        "created": true,
+                        "count": 3,
+                        "networks": [
+                          "Circles"
+                        ]
+                      },
+                      "circle": {
+                        "status": "success",
+                        "created": true,
+                        "count": 2,
+                        "blockchains": [
+                          "ETH-SEPOLIA",
+                          "MATIC-AMOY"
+                        ],
+                        "configured": true
+                      }
                     },
-                    "message": "Please check your email for verification code"
+                    "message": "User created successfully"
                   }
                 }
               }
@@ -342,12 +358,21 @@
                     "fiat": {
                       "NGN": 5678910,
                       "USD": 12345.67,
-                      "EUR": 8234.5
+                      "EUR": 8234.5,
+                      "GBP": 9876.54
                     },
                     "crypto": {
-                      "ESP": {
+                      "USDC": {
                         "amount": 1000,
-                        "usdValue": 1234.56
+                        "usdValue": 1000
+                      },
+                      "USDT": {
+                        "amount": 500,
+                        "usdValue": 500
+                      },
+                      "ESPEES": {
+                        "amount": 2000,
+                        "usdValue": 2000
                       }
                     }
                   }
@@ -478,6 +503,49 @@
         ]
       }
     },
+    "/balance/withdraw": {
+      "post": {
+        "operationId": "BalanceController_withdraw",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WithdrawDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Withdrawal request submitted successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Withdrawal request submitted successfully. You will receive an email confirmation shortly.",
+                    "withdrawalId": "wd_123456",
+                    "amount": 500,
+                    "currency": "USD",
+                    "status": "PENDING"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Withdraw funds",
+        "tags": [
+          "balance"
+        ]
+      }
+    },
     "/balance/convert": {
       "post": {
         "operationId": "BalanceController_convertCurrency",
@@ -590,7 +658,24 @@
         ],
         "responses": {
           "200": {
-            "description": ""
+            "description": "Exchange rates retrieved successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "base": "USD",
+                    "rates": {
+                      "EUR": 0.85,
+                      "GBP": 0.75,
+                      "NGN": 411.5,
+                      "USDC": 1,
+                      "USDT": 1,
+                      "ESPEES": 1
+                    }
+                  }
+                }
+              }
+            }
           }
         },
         "security": [
@@ -598,6 +683,7 @@
             "bearer": []
           }
         ],
+        "summary": "Get current exchange rates",
         "tags": [
           "balance"
         ]
@@ -631,7 +717,7 @@
         ]
       }
     },
-    "/balance/recent-activity": {
+    "/balance/activity": {
       "get": {
         "operationId": "BalanceController_getRecentActivity",
         "parameters": [],
@@ -644,15 +730,24 @@
                   "example": [
                     {
                       "type": "RECEIVED",
-                      "currency": "ESP",
-                      "amount": 0.05,
-                      "timestamp": "2024-03-20T10:00:00Z"
+                      "currency": "USDC",
+                      "amount": 100,
+                      "timestamp": "2024-03-20T10:00:00Z",
+                      "description": "Payment received"
                     },
                     {
                       "type": "SENT",
                       "currency": "USD",
-                      "amount": 123.45,
-                      "timestamp": "2024-03-20T07:00:00Z"
+                      "amount": 50,
+                      "timestamp": "2024-03-20T07:00:00Z",
+                      "description": "Transfer to john@example.com"
+                    },
+                    {
+                      "type": "WITHDRAWAL",
+                      "currency": "EUR",
+                      "amount": 200,
+                      "timestamp": "2024-03-19T15:30:00Z",
+                      "description": "Bank withdrawal"
                     }
                   ]
                 }
@@ -677,306 +772,40 @@
         ]
       }
     },
-    "/payments/{requestId}": {
-      "get": {
-        "operationId": "PaymentController_getPaymentPage",
-        "parameters": [
-          {
-            "name": "requestId",
-            "required": true,
-            "in": "path",
-            "description": "ID of the payment request",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Payment request details retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "paymentRequest": {
-                      "id": "abc123",
-                      "amount": 1000,
-                      "currency": "USD",
-                      "description": "Payment for services",
-                      "status": "PENDING",
-                      "requester": {
-                        "firstName": "John",
-                        "lastName": "Doe",
-                        "organisation": "Acme Corp"
-                      }
-                    },
-                    "pageData": {
-                      "title": "Payment to John Doe",
-                      "amount": 1000,
-                      "currency": "USD",
-                      "description": "Payment for services"
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Payment has already been processed"
-          },
-          "404": {
-            "description": "Payment request not found"
-          }
-        },
-        "security": [
-          {
-            "x-api-key": []
-          },
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get payment request details",
-        "tags": [
-          "payments"
-        ]
-      }
-    },
-    "/payments/{requestId}/process": {
-      "post": {
-        "operationId": "PaymentController_processPayment",
-        "parameters": [
-          {
-            "name": "requestId",
-            "required": true,
-            "in": "path",
-            "description": "ID of the payment request to process",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "example": {
-                  "userId": "user123"
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Payment processed successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "message": "Payment processed successfully"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Payment has already been processed"
-          },
-          "401": {
-            "description": "Authentication failed"
-          },
-          "404": {
-            "description": "Payment request not found"
-          },
-          "422": {
-            "description": "Insufficient balance for this transaction"
-          }
-        },
-        "security": [
-          {
-            "x-api-key": []
-          },
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Process payment for a payment request",
-        "tags": [
-          "payments"
-        ]
-      }
-    },
-    "/transactions": {
-      "get": {
-        "operationId": "TransactionController_getTransactions",
-        "parameters": [
-          {
-            "name": "type",
-            "required": false,
-            "in": "query",
-            "description": "Filter by transaction type",
-            "schema": {
-              "enum": [
-                "PAYMENT",
-                "TRANSFER",
-                "DEPOSIT",
-                "WITHDRAWAL"
-              ],
-              "type": "string"
-            }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "description": "Filter by transaction status",
-            "schema": {
-              "enum": [
-                "PENDING",
-                "COMPLETED",
-                "FAILED",
-                "CANCELLED"
-              ],
-              "type": "string"
-            }
-          },
-          {
-            "name": "search",
-            "required": false,
-            "in": "query",
-            "description": "Search by transaction ID or recipient name",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Transaction history retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "properties": {
-                    "message": {
-                      "type": "string",
-                      "example": "Transaction history retrieved successfully"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": {
-                          "id": {
-                            "type": "string",
-                            "example": "TX123"
-                          },
-                          "date": {
-                            "type": "string",
-                            "example": "2024-02-20T12:00:00Z"
-                          },
-                          "type": {
-                            "type": "string",
-                            "enum": [
-                              "PAYMENT",
-                              "TRANSFER",
-                              "DEPOSIT",
-                              "WITHDRAWAL"
-                            ]
-                          },
-                          "amount": {
-                            "type": "number",
-                            "example": 500
-                          },
-                          "currency": {
-                            "type": "string",
-                            "example": "USD"
-                          },
-                          "status": {
-                            "type": "string",
-                            "enum": [
-                              "PENDING",
-                              "COMPLETED",
-                              "FAILED",
-                              "CANCELLED"
-                            ]
-                          },
-                          "note": {
-                            "type": "string",
-                            "example": "Payment for services"
-                          },
-                          "recipient": {
-                            "type": "string",
-                            "example": "John Doe"
-                          },
-                          "sender": {
-                            "type": "string",
-                            "example": "Jane Smith"
-                          }
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Error fetching transactions"
-          },
-          "401": {
-            "description": "Authentication failed"
-          },
-          "404": {
-            "description": "No transactions found"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get user transaction history",
-        "tags": [
-          "transactions"
-        ]
-      }
-    },
     "/payment-links": {
       "get": {
-        "operationId": "PaymentLinkController_getActiveLinks",
+        "operationId": "PaymentLinkController_getPaymentLinks",
         "parameters": [],
         "responses": {
           "200": {
-            "description": "List of active payment links retrieved successfully",
+            "description": "Payment links retrieved successfully",
             "content": {
               "application/json": {
                 "schema": {
                   "example": {
                     "links": [
                       {
-                        "id": "1",
-                        "name": "Payment Link #1",
-                        "url": "https://escrow-pay.vercel.app/pay/[id]",
+                        "id": "lnk_123456",
+                        "name": "Payment for Services",
+                        "amount": 100,
+                        "currency": "USD",
+                        "url": "https://pay.paylinc.org/lnk_123456",
                         "status": "ACTIVE",
-                        "type": "SELLING",
-                        "transactionType": "CRYPTOCURRENCY",
-                        "defaultAmount": 1000,
-                        "defaultCurrency": "USD",
-                        "blockchainStatus": "AWAITING_PAYMENT"
+                        "createdAt": "2024-01-15T10:30:00Z"
                       }
                     ]
                   }
                 }
               }
             }
-          },
-          "401": {
-            "description": "Unauthorized"
           }
         },
-        "summary": "Get active payment links",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Get user payment links",
         "tags": [
           "payment-links"
         ]
@@ -1001,116 +830,35 @@
               "application/json": {
                 "schema": {
                   "example": {
-                    "id": "lnk7x2p9q-r5t",
-                    "name": "Premium Product",
-                    "url": "https://escrow-pay.vercel.app/pay/lnk7x2p9q-r5t",
-                    "type": "SELLING",
-                    "transactionType": "PHYSICAL_GOODS",
-                    "defaultAmount": 99.99,
-                    "defaultCurrency": "USD",
-                    "description": "High-quality premium product with exclusive features."
+                    "message": "Payment link created successfully",
+                    "link": {
+                      "id": "lnk_123456",
+                      "name": "Payment for Services",
+                      "amount": 100,
+                      "currency": "USD",
+                      "url": "https://pay.paylinc.org/lnk_123456",
+                      "status": "ACTIVE"
+                    }
                   }
                 }
               }
             }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
           }
         },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
         "summary": "Create new payment link",
         "tags": [
           "payment-links"
         ]
       }
     },
-    "/payment-links/settings": {
-      "patch": {
-        "operationId": "PaymentLinkController_updateSettings",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdatePaymentLinkSettingsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Settings updated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "message": "Settings updated successfully",
-                    "settings": {
-                      "defaultCurrency": "USD",
-                      "defaultExpirationTime": 24
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "summary": "Update payment link settings",
-        "tags": [
-          "payment-links"
-        ]
-      }
-    },
-    "/payment-links/{id}/initiate": {
-      "post": {
-        "operationId": "PaymentLinkController_initiateTransaction",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InitiateTransactionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Transaction initiated"
-          },
-          "400": {
-            "description": "Invalid request"
-          }
-        },
-        "summary": "Initiate a transaction for a payment link",
-        "tags": [
-          "payment-links"
-        ]
-      }
-    },
-    "/payment-links/{id}/validate": {
+    "/payment-links/{id}": {
       "get": {
-        "operationId": "PaymentLinkController_validatePaymentLink",
+        "operationId": "PaymentLinkController_getPaymentLinkDetails",
         "parameters": [
           {
             "name": "id",
@@ -1123,123 +871,183 @@
         ],
         "responses": {
           "200": {
-            "description": "Payment link details",
+            "description": "Payment link details retrieved",
             "content": {
               "application/json": {
                 "schema": {
                   "example": {
-                    "seller": {
-                      "id": "user123",
-                      "name": "John Doe",
-                      "organisation": "Tech Corp",
-                      "email": "john@example.com",
-                      "wallet": {
-                        "address": "0x123...",
-                        "network": "ETHEREUM",
-                        "chainId": 1
-                      }
-                    },
-                    "paymentLink": {
-                      "id": "link123",
-                      "name": "Premium Service",
-                      "type": "SELLING",
-                      "transactionType": "SERVICES",
-                      "defaultAmount": 100,
-                      "defaultCurrency": "USD",
-                      "isAmountNegotiable": true,
-                      "minimumAmount": 50,
-                      "maximumAmount": 200,
-                      "paymentMethods": [
-                        "CARD",
-                        "CRYPTO"
-                      ],
-                      "serviceDetails": {
-                        "description": "Premium consulting service",
-                        "deliveryTimeline": "5 days",
-                        "terms": {
-                          "conditions": [
-                            "Term 1",
-                            "Term 2"
-                          ],
-                          "cancellationPolicy": "Cancellation policy...",
-                          "refundPolicy": "Refund policy..."
-                        }
-                      },
-                      "verificationMethod": "SELLER_PROOF_SUBMISSION",
-                      "metadata": {
-                        "customerRequirements": {
-                          "emailRequired": true,
-                          "phoneRequired": false,
-                          "addressRequired": false
-                        },
-                        "escrowConditions": {
-                          "timeoutPeriod": 24,
-                          "autoReleaseEnabled": true
-                        }
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "Payment link not found"
-          }
-        },
-        "summary": "Validate payment link and get details",
-        "tags": [
-          "payment-links"
-        ]
-      }
-    },
-    "/payment-links/{id}/transaction/{txId}": {
-      "get": {
-        "operationId": "PaymentLinkController_getPaymentLinkTransaction",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "txId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Transaction details retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "transactionId": "1",
-                    "status": "PENDING",
-                    "amount": 99.99,
+                    "id": "lnk_123456",
+                    "name": "Payment for Services",
+                    "amount": 100,
                     "currency": "USD",
-                    "paymentDetails": {
-                      "escrowAddress": "0x...",
-                      "paymentMethod": "CARD",
-                      "expiresAt": "2024-03-10T15:00:00Z"
+                    "paymentMethods": {
+                      "card": true,
+                      "crypto": true
+                    },
+                    "createdBy": {
+                      "name": "John Doe",
+                      "email": "john@example.com"
                     }
                   }
                 }
               }
             }
-          },
-          "404": {
-            "description": "Transaction Not Found"
           }
         },
-        "summary": "Get transaction details for payment link",
+        "summary": "Get payment link details (public)",
+        "tags": [
+          "payment-links"
+        ]
+      },
+      "patch": {
+        "operationId": "PaymentLinkController_updatePaymentLink",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePaymentLinkDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment link updated successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Update payment link",
+        "tags": [
+          "payment-links"
+        ]
+      },
+      "delete": {
+        "operationId": "PaymentLinkController_deletePaymentLink",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment link deleted successfully"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Delete payment link",
+        "tags": [
+          "payment-links"
+        ]
+      }
+    },
+    "/payment-links/{id}/initialize": {
+      "post": {
+        "operationId": "PaymentLinkController_initializePayment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProcessPaymentDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Payment initialized successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Payment initialized successfully",
+                    "paymentLink": {
+                      "id": "lnk_123456",
+                      "name": "Payment for Services",
+                      "amount": 100,
+                      "currency": "USD"
+                    },
+                    "transactionId": "txn_123456"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Initialize payment for frontend",
+        "tags": [
+          "payment-links"
+        ]
+      }
+    },
+    "/payment-links/{id}/confirm": {
+      "post": {
+        "operationId": "PaymentLinkController_confirmPayment",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Payment confirmed successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "example": {
+                    "message": "Payment confirmed successfully",
+                    "transaction": {
+                      "id": "txn_123456",
+                      "status": "COMPLETED",
+                      "amount": 100,
+                      "currency": "USD"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "summary": "Confirm payment completion",
         "tags": [
           "payment-links"
         ]
@@ -1266,520 +1074,9 @@
             "description": "Transaction not found"
           }
         },
-        "summary": "Get general transaction details",
+        "summary": "Get transaction details",
         "tags": [
           "payment-links"
-        ]
-      }
-    },
-    "/payment-links/{id}/transaction/{txId}/verify": {
-      "post": {
-        "operationId": "PaymentLinkController_verifyTransaction",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "txId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Transaction verified successfully"
-          },
-          "400": {
-            "description": "Verification Failed"
-          }
-        },
-        "summary": "Verify transaction completion",
-        "tags": [
-          "payment-links"
-        ]
-      }
-    },
-    "/payment-links/{id}/success": {
-      "get": {
-        "operationId": "PaymentLinkController_getSuccessDetails",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "txId",
-            "required": true,
-            "in": "query",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success details retrieved",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "message": "Transaction completed successfully",
-                    "details": {
-                      "transaction": {
-                        "transactionId": "1234",
-                        "amount": 100,
-                        "currency": "USD",
-                        "status": "COMPLETED",
-                        "customer": {
-                          "email": "customer@example.com",
-                          "name": "John Doe"
-                        },
-                        "createdAt": "2025-01-06T01:41:24.524Z",
-                        "escrowAddress": null,
-                        "paymentMethod": null,
-                        "expiresAt": null
-                      },
-                      "paymentLink": {
-                        "name": "Product Purchase",
-                        "type": "SELLING",
-                        "transactionType": "PHYSICAL_GOODS"
-                      },
-                      "successMessage": "Transaction completed successfully!",
-                      "nextSteps": [
-                        "Transaction is complete",
-                        "Check your email for transaction details"
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Bad Request"
-          },
-          "404": {
-            "description": "Not Found"
-          }
-        },
-        "summary": "Get transaction success details",
-        "tags": [
-          "payment-links"
-        ]
-      }
-    },
-    "/payment-links/transactions/{id}/verify": {
-      "post": {
-        "operationId": "PaymentLinkController_verifyServiceDelivery",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Verify service delivery",
-        "tags": [
-          "payment-links"
-        ]
-      }
-    },
-    "/payment-links/{id}/disable": {
-      "patch": {
-        "operationId": "PaymentLinkController_disablePaymentLink",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Payment link disabled successfully"
-          },
-          "400": {
-            "description": "Bad request"
-          },
-          "401": {
-            "description": "Unauthorized"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Disable a payment link",
-        "tags": [
-          "payment-links"
-        ]
-      }
-    },
-    "/payment-links/{id}": {
-      "delete": {
-        "operationId": "PaymentLinkController_deletePaymentLink",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Payment link deleted successfully"
-          },
-          "403": {
-            "description": "Unauthorized to delete this payment link"
-          },
-          "404": {
-            "description": "Payment link not found"
-          }
-        },
-        "summary": "Delete a payment link",
-        "tags": [
-          "payment-links"
-        ]
-      },
-      "put": {
-        "operationId": "PaymentLinkController_updatePaymentLink",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdatePaymentLinkDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Payment link updated successfully"
-          },
-          "403": {
-            "description": "Unauthorized to update this payment link"
-          },
-          "404": {
-            "description": "Payment link not found"
-          }
-        },
-        "summary": "Update a payment link",
-        "tags": [
-          "payment-links"
-        ]
-      }
-    },
-    "/webhooks/stripe": {
-      "post": {
-        "operationId": "WebhookController_handleStripeWebhook",
-        "parameters": [
-          {
-            "name": "stripe-signature",
-            "required": true,
-            "in": "header",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "summary": "Handle Stripe webhook events",
-        "tags": [
-          "webhooks"
-        ]
-      }
-    },
-    "/subscription/plan": {
-      "get": {
-        "operationId": "SubscriptionController_getCurrentPlan",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Current subscription plan details",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SubscriptionPlan"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get current subscription plan",
-        "tags": [
-          "subscription"
-        ]
-      }
-    },
-    "/subscription/upgrade": {
-      "post": {
-        "operationId": "SubscriptionController_upgradePlan",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateSubscriptionDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Subscription plan upgraded successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/SubscriptionPlan"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Upgrade subscription plan",
-        "tags": [
-          "subscription"
-        ]
-      }
-    },
-    "/billing/payment-methods": {
-      "get": {
-        "operationId": "BillingController_getPaymentMethods",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get all payment methods",
-        "tags": [
-          "billing"
-        ]
-      }
-    },
-    "/billing/payment-methods/card": {
-      "post": {
-        "operationId": "BillingController_addCardPaymentMethod",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CardPaymentMethodDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Add card payment method",
-        "tags": [
-          "billing"
-        ]
-      }
-    },
-    "/billing/payment-methods/bank": {
-      "post": {
-        "operationId": "BillingController_addBankTransferMethod",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/BankTransferMethodDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Add bank transfer payment method",
-        "tags": [
-          "billing"
-        ]
-      }
-    },
-    "/billing/payment-methods/{id}/default": {
-      "put": {
-        "operationId": "BillingController_setDefaultPaymentMethod",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Set payment method as default",
-        "tags": [
-          "billing"
-        ]
-      }
-    },
-    "/billing/payment-methods/{id}": {
-      "delete": {
-        "operationId": "BillingController_deletePaymentMethod",
-        "parameters": [
-          {
-            "name": "id",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Delete payment method",
-        "tags": [
-          "billing"
-        ]
-      }
-    },
-    "/billing/auto-payment-settings": {
-      "put": {
-        "operationId": "BillingController_updateAutoPaymentSettings",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/AutoPaymentSettingsDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Update auto-payment settings",
-        "tags": [
-          "billing"
-        ]
-      }
-    },
-    "/billing/history": {
-      "get": {
-        "operationId": "BillingController_getBillingHistory",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": ""
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get billing history",
-        "tags": [
-          "billing"
         ]
       }
     },
@@ -2003,336 +1300,6 @@
           "profile"
         ]
       }
-    },
-    "/support/tickets": {
-      "post": {
-        "operationId": "SupportController_createTicket",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CreateSupportTicketDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Support ticket created successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "id": "ticket_123",
-                    "subject": "Payment Issue",
-                    "status": "OPEN",
-                    "createdAt": "2024-03-10T12:00:00Z",
-                    "ticketNumber": "TKT-2024-001"
-                  }
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Invalid ticket data provided"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Create a new support ticket",
-        "tags": [
-          "support"
-        ]
-      },
-      "get": {
-        "operationId": "SupportController_getTickets",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "Support tickets retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "tickets": [
-                      {
-                        "id": "ticket_123",
-                        "subject": "Payment Issue",
-                        "status": "OPEN",
-                        "createdAt": "2024-03-10T12:00:00Z",
-                        "ticketNumber": "TKT-2024-001",
-                        "lastUpdated": "2024-03-10T12:00:00Z"
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get user support tickets",
-        "tags": [
-          "support"
-        ]
-      }
-    },
-    "/support/live-chat/initiate": {
-      "post": {
-        "operationId": "LiveChatController_initiateChat",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/InitiateChatDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Chat session initiated successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "sessionId": "chat_123",
-                    "status": "ACTIVE",
-                    "createdAt": "2024-03-10T12:00:00Z",
-                    "estimatedWaitTime": "2 minutes"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Initiate a live chat session",
-        "tags": [
-          "support"
-        ]
-      }
-    },
-    "/support/live-chat/session/{sessionId}": {
-      "get": {
-        "operationId": "LiveChatController_getChatSession",
-        "parameters": [
-          {
-            "name": "sessionId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Chat session details retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "sessionId": "chat_123",
-                    "status": "ACTIVE",
-                    "messages": [
-                      {
-                        "id": "msg_1",
-                        "content": "Hello, how can I help you today?",
-                        "sender": "AGENT",
-                        "timestamp": "2024-03-10T12:00:00Z"
-                      }
-                    ]
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get chat session details",
-        "tags": [
-          "support"
-        ]
-      }
-    },
-    "/support/live-chat/session/{sessionId}/message": {
-      "post": {
-        "operationId": "LiveChatController_sendMessage",
-        "parameters": [
-          {
-            "name": "sessionId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ChatMessageDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Message sent successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "messageId": "msg_1",
-                    "content": "Hello, I need help with...",
-                    "timestamp": "2024-03-10T12:00:00Z",
-                    "status": "SENT"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Send a message in chat session",
-        "tags": [
-          "support"
-        ]
-      }
-    },
-    "/support/live-chat/session/{sessionId}/end": {
-      "post": {
-        "operationId": "LiveChatController_endChatSession",
-        "parameters": [
-          {
-            "name": "sessionId",
-            "required": true,
-            "in": "path",
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Chat session ended successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "sessionId": "chat_123",
-                    "status": "CLOSED",
-                    "endedAt": "2024-03-10T12:30:00Z"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "End chat session",
-        "tags": [
-          "support"
-        ]
-      }
-    },
-    "/notifications": {
-      "get": {
-        "operationId": "NotificationsController_getNotifications",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "List of notifications retrieved successfully",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "notifications": [
-                      {
-                        "id": "notif_123",
-                        "type": "PAYMENT_RECEIVED",
-                        "title": "New payment received",
-                        "message": "You have received a new payment of $100",
-                        "read": false,
-                        "createdAt": "2024-03-21T10:00:00Z"
-                      }
-                    ],
-                    "unreadCount": 1
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Get user notifications",
-        "tags": [
-          "notifications"
-        ]
-      }
-    },
-    "/notifications/mark-all-read": {
-      "put": {
-        "operationId": "NotificationsController_markAllAsRead",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "All notifications marked as read",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "example": {
-                    "message": "All notifications marked as read"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Mark all notifications as read",
-        "tags": [
-          "notifications"
-        ]
-      }
     }
   },
   "info": {
@@ -2520,7 +1487,7 @@
           "recipientAddress": {
             "type": "string",
             "example": "user@example.com",
-            "description": "Recipient email (for FIAT) or wallet address (for CRYPTO)"
+            "description": "Recipient email or wallet address"
           },
           "amount": {
             "type": "number",
@@ -2530,17 +1497,16 @@
           "currency": {
             "type": "string",
             "enum": [
-              "NGN",
               "USD",
+              "GBP",
               "EUR",
-              "ESP",
-              "BTC",
-              "ETH",
+              "NGN",
+              "USDC",
               "USDT",
-              "USDC"
+              "ESPEES"
             ],
             "example": "USD",
-            "description": "Currency for FIAT transfers"
+            "description": "Currency for the transfer"
           },
           "note": {
             "type": "string",
@@ -2551,7 +1517,8 @@
         "required": [
           "assetType",
           "recipientAddress",
-          "amount"
+          "amount",
+          "currency"
         ]
       },
       "RequestPaymentDto": {
@@ -2560,17 +1527,16 @@
           "currency": {
             "type": "string",
             "enum": [
-              "NGN",
               "USD",
+              "GBP",
               "EUR",
-              "ESP",
-              "BTC",
-              "ETH",
+              "NGN",
+              "USDC",
               "USDT",
-              "USDC"
+              "ESPEES"
             ],
             "example": "USD",
-            "description": "Currency for payment request (FIAT or CRYPTO)"
+            "description": "Currency for payment request"
           },
           "amount": {
             "type": "number",
@@ -2595,217 +1561,96 @@
           "description"
         ]
       },
-      "ConvertCurrencyDto": {
+      "WithdrawDto": {
         "type": "object",
         "properties": {
-          "from": {
+          "currency": {
             "type": "string",
-            "example": "ESP",
-            "description": "Currency to convert from"
-          },
-          "to": {
-            "type": "string",
+            "enum": [
+              "USD",
+              "GBP",
+              "EUR",
+              "NGN",
+              "USDC",
+              "USDT",
+              "ESPEES"
+            ],
             "example": "USD",
-            "description": "Currency to convert to"
+            "description": "Currency to withdraw"
           },
           "amount": {
             "type": "number",
-            "example": 1000,
-            "description": "Amount to convert"
+            "example": 500,
+            "description": "Amount to withdraw"
+          },
+          "accountNameOrAddress": {
+            "type": "string",
+            "example": "John Doe",
+            "description": "Bank account holder name (for fiat) or crypto address (for crypto)"
+          },
+          "accountNumber": {
+            "type": "string",
+            "example": "1234567890",
+            "description": "Bank account number (required for fiat withdrawals)"
+          },
+          "bankName": {
+            "type": "string",
+            "example": "First Bank of Nigeria",
+            "description": "Bank name (required for fiat withdrawals)"
+          },
+          "bankCode": {
+            "type": "string",
+            "example": "12345",
+            "description": "Bank sort code or routing number (required for some fiat withdrawals)"
           }
         },
         "required": [
-          "from",
-          "to",
-          "amount"
+          "currency",
+          "amount",
+          "accountNameOrAddress"
         ]
       },
-      "ConversionResponse": {
+      "ConvertCurrencyDto": {
         "type": "object",
         "properties": {
-          "convertedAmount": {
+          "amount": {
             "type": "number",
-            "example": 1800,
-            "description": "Converted amount"
-          },
-          "rate": {
-            "type": "number",
-            "example": 1800,
-            "description": "Conversion rate"
+            "description": "Amount to convert",
+            "example": 100
           },
           "from": {
             "type": "string",
-            "example": "ESP",
-            "description": "Source currency"
+            "enum": [
+              "USD",
+              "GBP",
+              "EUR",
+              "NGN",
+              "USDC",
+              "USDT",
+              "ESPEES"
+            ],
+            "description": "Source currency",
+            "example": "USD"
           },
           "to": {
             "type": "string",
-            "example": "NGN",
-            "description": "Target currency"
+            "enum": [
+              "USD",
+              "GBP",
+              "EUR",
+              "NGN",
+              "USDC",
+              "USDT",
+              "ESPEES"
+            ],
+            "description": "Target currency",
+            "example": "EUR"
           }
         },
         "required": [
-          "convertedAmount",
-          "rate",
+          "amount",
           "from",
           "to"
-        ]
-      },
-      "PaymentMethodDetails": {
-        "type": "object",
-        "properties": {
-          "methodId": {
-            "type": "string"
-          },
-          "type": {
-            "type": "string",
-            "enum": [
-              "CARD",
-              "BANK_TRANSFER",
-              "CRYPTOCURRENCY"
-            ]
-          },
-          "isDefault": {
-            "type": "boolean"
-          },
-          "details": {
-            "type": "object"
-          }
-        },
-        "required": [
-          "methodId",
-          "type",
-          "isDefault",
-          "details"
-        ]
-      },
-      "CryptocurrencyDetails": {
-        "type": "object",
-        "properties": {
-          "tokenAddress": {
-            "type": "string"
-          },
-          "chainId": {
-            "type": "number"
-          },
-          "tokenSymbol": {
-            "type": "string"
-          },
-          "decimals": {
-            "type": "number"
-          },
-          "requiredConfirmations": {
-            "type": "number"
-          },
-          "network": {
-            "type": "string"
-          },
-          "acceptedTokens": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "networkOptions": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "tokenAddress",
-          "chainId",
-          "tokenSymbol",
-          "decimals",
-          "requiredConfirmations",
-          "network",
-          "acceptedTokens",
-          "networkOptions"
-        ]
-      },
-      "DealStage": {
-        "type": "object",
-        "properties": {
-          "name": {
-            "type": "string"
-          },
-          "paymentPercentage": {
-            "type": "number"
-          },
-          "requirements": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "description": {
-            "type": "string"
-          },
-          "timelineInDays": {
-            "type": "number"
-          },
-          "requiredDocuments": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "name",
-          "paymentPercentage",
-          "requirements",
-          "description",
-          "timelineInDays",
-          "requiredDocuments"
-        ]
-      },
-      "DealDetails": {
-        "type": "object",
-        "properties": {
-          "dealType": {
-            "type": "string",
-            "description": "Type of deal"
-          },
-          "title": {
-            "type": "string",
-            "description": "Title of the deal"
-          },
-          "description": {
-            "type": "string",
-            "description": "Detailed description of the deal"
-          },
-          "timeline": {
-            "type": "string",
-            "description": "Deal timeline"
-          },
-          "stages": {
-            "description": "Deal stages",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DealStage"
-            }
-          },
-          "requireAllPartyApproval": {
-            "type": "boolean"
-          },
-          "stageTransitionDelay": {
-            "type": "number"
-          },
-          "customStageRules": {
-            "type": "object"
-          }
-        },
-        "required": [
-          "dealType",
-          "title",
-          "description",
-          "timeline",
-          "stages",
-          "requireAllPartyApproval",
-          "stageTransitionDelay",
-          "customStageRules"
         ]
       },
       "CreatePaymentLinkDto": {
@@ -2813,446 +1658,89 @@
         "properties": {
           "name": {
             "type": "string",
-            "description": "Name of the payment link"
+            "description": "Name/description of the payment link",
+            "example": "Payment for Design Services"
           },
-          "type": {
+          "amount": {
+            "type": "number",
+            "description": "Amount to be received",
+            "example": 100,
+            "minimum": 0.01
+          },
+          "currency": {
             "type": "string",
             "enum": [
-              "BUYING",
-              "SELLING"
-            ]
-          },
-          "transactionType": {
-            "type": "string",
-            "enum": [
-              "CRYPTOCURRENCY",
-              "SERVICES",
-              "DEALS"
-            ]
-          },
-          "paymentMethods": {
-            "description": "Must include all payment methods (Card, Bank Transfer, Cryptocurrency)",
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/PaymentMethodDetails"
-            }
-          },
-          "verificationMethod": {
-            "type": "string",
-            "enum": [
-              "SELLER_PROOF_SUBMISSION",
-              "BUYER_CONFIRMATION",
-              "THIRD_PARTY_ARBITRATION",
-              "BLOCKCHAIN_CONFIRMATION"
-            ]
-          },
-          "allowedBuyers": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "metadata": {
-            "type": "object"
-          },
-          "defaultAmount": {
-            "type": "number"
-          },
-          "defaultCurrency": {
-            "type": "string"
-          },
-          "isAmountNegotiable": {
-            "type": "boolean"
-          },
-          "minimumAmount": {
-            "type": "number"
-          },
-          "maximumAmount": {
-            "type": "number"
-          },
-          "cryptocurrencyDetails": {
-            "$ref": "#/components/schemas/CryptocurrencyDetails"
-          },
-          "escrowConditions": {
-            "type": "object"
-          },
-          "verificationRequirements": {
-            "type": "object"
-          },
-          "customerRequirements": {
-            "type": "object"
-          },
-          "environment": {
-            "type": "string",
-            "enum": [
-              "SANDBOX",
-              "PRODUCTION"
+              "USD",
+              "GBP",
+              "EUR",
+              "NGN",
+              "USDC",
+              "USDT",
+              "ESPEES"
             ],
-            "default": "SANDBOX",
-            "description": "Payment environment (defaults to SANDBOX)"
-          },
-          "isSandbox": {
-            "type": "boolean",
-            "default": true,
-            "description": "Whether to use sandbox mode (defaults to true)"
-          },
-          "dealDetails": {
-            "$ref": "#/components/schemas/DealDetails"
+            "description": "Currency for the payment",
+            "example": "USD"
           }
         },
         "required": [
           "name",
-          "type",
-          "transactionType",
-          "paymentMethods",
-          "verificationMethod",
-          "defaultAmount",
-          "defaultCurrency",
-          "isAmountNegotiable",
-          "minimumAmount",
-          "maximumAmount",
-          "cryptocurrencyDetails",
-          "escrowConditions",
-          "verificationRequirements",
-          "customerRequirements",
-          "environment",
-          "dealDetails"
+          "amount",
+          "currency"
         ]
       },
-      "UpdatePaymentLinkSettingsDto": {
+      "ProcessPaymentDto": {
         "type": "object",
         "properties": {
-          "defaultCurrency": {
-            "type": "string"
-          },
-          "defaultExpirationTime": {
-            "type": "number"
-          }
-        },
-        "required": [
-          "defaultCurrency",
-          "defaultExpirationTime"
-        ]
-      },
-      "InitiateTransactionDto": {
-        "type": "object",
-        "properties": {
-          "amount": {
-            "type": "number"
-          },
-          "currency": {
-            "type": "string"
-          },
           "customerEmail": {
-            "type": "string"
+            "type": "string",
+            "description": "Customer email address",
+            "example": "customer@example.com"
           },
           "customerName": {
-            "type": "string"
+            "type": "string",
+            "description": "Customer name",
+            "example": "John Doe"
           },
-          "buyerWalletAddress": {
-            "type": "string"
+          "paymentMethodToken": {
+            "type": "string",
+            "description": "Payment method token from Stripe/Paystack"
           },
-          "paymentMethod": {
-            "type": "string"
-          },
-          "paymentDetails": {
-            "type": "object"
+          "cryptoAddress": {
+            "type": "string",
+            "description": "Crypto wallet address for crypto payments"
           }
         },
         "required": [
-          "amount",
-          "currency",
           "customerEmail",
           "customerName"
-        ]
-      },
-      "DealTerms": {
-        "type": "object",
-        "properties": {}
-      },
-      "ServiceDetails": {
-        "type": "object",
-        "properties": {
-          "description": {
-            "type": "string",
-            "description": "Description of the service"
-          },
-          "deliveryTimeline": {
-            "type": "string",
-            "description": "Delivery timeline"
-          },
-          "terms": {
-            "$ref": "#/components/schemas/DealTerms"
-          }
-        },
-        "required": [
-          "description",
-          "deliveryTimeline",
-          "terms"
-        ]
-      },
-      "ServiceProofRequirements": {
-        "type": "object",
-        "properties": {
-          "description": {
-            "type": "string",
-            "description": "Description of required proof"
-          },
-          "proofFiles": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "completionDate": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "description",
-          "proofFiles",
-          "completionDate"
         ]
       },
       "UpdatePaymentLinkDto": {
         "type": "object",
         "properties": {
           "name": {
-            "type": "string"
+            "type": "string",
+            "description": "Name/description of the payment link"
           },
-          "type": {
-            "type": "string"
+          "amount": {
+            "type": "number",
+            "description": "Amount to be received",
+            "minimum": 0.01
           },
-          "defaultAmount": {
-            "type": "number"
-          },
-          "defaultCurrency": {
-            "type": "string"
-          },
-          "isAmountNegotiable": {
-            "type": "boolean"
-          },
-          "minimumAmount": {
-            "type": "number"
-          },
-          "maximumAmount": {
-            "type": "number"
-          },
-          "paymentMethods": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "serviceDetails": {
-            "$ref": "#/components/schemas/ServiceDetails"
-          },
-          "serviceProof": {
-            "$ref": "#/components/schemas/ServiceProofRequirements"
-          },
-          "verificationMethod": {
-            "type": "string"
-          },
-          "allowedBuyers": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "metadata": {
-            "type": "object"
+          "currency": {
+            "type": "string",
+            "enum": [
+              "USD",
+              "GBP",
+              "EUR",
+              "NGN",
+              "USDC",
+              "USDT",
+              "ESPEES"
+            ],
+            "description": "Currency for the payment"
           }
         }
-      },
-      "SubscriptionUsage": {
-        "type": "object",
-        "properties": {
-          "monthlyTransactions": {
-            "type": "number",
-            "example": 85,
-            "description": "Current monthly transactions"
-          },
-          "monthlyTransactionLimit": {
-            "type": "number",
-            "example": 100,
-            "description": "Monthly transaction limit"
-          },
-          "apiCalls": {
-            "type": "number",
-            "example": 450,
-            "description": "Current API calls"
-          },
-          "apiCallLimit": {
-            "type": "number",
-            "example": 500,
-            "description": "API call limit"
-          },
-          "monthlyPaymentLinks": {
-            "type": "number",
-            "example": 5,
-            "description": "Current payment links created this month"
-          },
-          "paymentLinkLimit": {
-            "type": "number",
-            "example": 10,
-            "description": "Payment link creation limit"
-          }
-        },
-        "required": [
-          "monthlyTransactions",
-          "monthlyTransactionLimit",
-          "apiCalls",
-          "apiCallLimit",
-          "monthlyPaymentLinks",
-          "paymentLinkLimit"
-        ]
-      },
-      "SubscriptionPlan": {
-        "type": "object",
-        "properties": {
-          "type": {
-            "type": "string",
-            "enum": [
-              "STARTER",
-              "PRO",
-              "ENTERPRISE"
-            ]
-          },
-          "price": {
-            "type": "number",
-            "example": 0,
-            "description": "Monthly cost in USD"
-          },
-          "isActive": {
-            "type": "boolean",
-            "example": true,
-            "description": "Whether plan is currently active"
-          },
-          "usage": {
-            "$ref": "#/components/schemas/SubscriptionUsage"
-          }
-        },
-        "required": [
-          "type",
-          "price",
-          "isActive",
-          "usage"
-        ]
-      },
-      "UpdateSubscriptionDto": {
-        "type": "object",
-        "properties": {
-          "planType": {
-            "type": "string",
-            "enum": [
-              "STARTER",
-              "PRO",
-              "ENTERPRISE"
-            ]
-          }
-        },
-        "required": [
-          "planType"
-        ]
-      },
-      "CardPaymentMethodDto": {
-        "type": "object",
-        "properties": {
-          "cardNumber": {
-            "type": "string",
-            "example": "4242424242424242"
-          },
-          "expiryDate": {
-            "type": "string",
-            "example": "12/24"
-          },
-          "cvc": {
-            "type": "string",
-            "example": "123"
-          },
-          "cardholderName": {
-            "type": "string",
-            "example": "John Doe"
-          },
-          "setAsDefault": {
-            "type": "boolean",
-            "example": true
-          }
-        },
-        "required": [
-          "cardNumber",
-          "expiryDate",
-          "cvc",
-          "cardholderName"
-        ]
-      },
-      "BankTransferMethodDto": {
-        "type": "object",
-        "properties": {
-          "bankName": {
-            "type": "string",
-            "example": "Guaranty Trust Bank",
-            "description": "Name of the bank",
-            "enum": [
-              "Access Bank",
-              "First Bank of Nigeria",
-              "Guaranty Trust Bank",
-              "United Bank for Africa",
-              "Zenith Bank",
-              "Sterling Bank",
-              "Ecobank Nigeria",
-              "Fidelity Bank",
-              "Union Bank of Nigeria",
-              "Wema Bank",
-              "Kuda",
-              "Opay"
-            ]
-          },
-          "accountHolderName": {
-            "type": "string",
-            "example": "John Doe"
-          },
-          "accountNumber": {
-            "type": "string",
-            "example": "000123456789"
-          },
-          "accountType": {
-            "type": "string",
-            "enum": [
-              "CURRENT",
-              "SAVINGS"
-            ],
-            "example": "CURRENT",
-            "description": "Type of bank account (CURRENT or SAVINGS)"
-          },
-          "setAsDefault": {
-            "type": "boolean",
-            "example": true
-          }
-        },
-        "required": [
-          "bankName",
-          "accountHolderName",
-          "accountNumber",
-          "accountType"
-        ]
-      },
-      "AutoPaymentSettingsDto": {
-        "type": "object",
-        "properties": {
-          "autoRenewSubscription": {
-            "type": "boolean",
-            "example": true
-          },
-          "sendPaymentNotifications": {
-            "type": "boolean",
-            "example": true
-          }
-        },
-        "required": [
-          "autoRenewSubscription",
-          "sendPaymentNotifications"
-        ]
       },
       "UpdateProfileDto": {
         "type": "object",
@@ -3310,56 +1798,6 @@
             "description": "Enable/disable webhook notifications"
           }
         }
-      },
-      "CreateSupportTicketDto": {
-        "type": "object",
-        "properties": {
-          "subject": {
-            "type": "string",
-            "example": "Payment Issue",
-            "description": "Subject of the support ticket"
-          },
-          "message": {
-            "type": "string",
-            "example": "I am having trouble processing a payment...",
-            "description": "Detailed description of the issue"
-          }
-        },
-        "required": [
-          "subject",
-          "message"
-        ]
-      },
-      "InitiateChatDto": {
-        "type": "object",
-        "properties": {
-          "topic": {
-            "type": "string",
-            "example": "Payment Processing Issue",
-            "description": "Initial topic or subject for the chat"
-          },
-          "initialMessage": {
-            "type": "string",
-            "example": "I need help with processing a payment",
-            "description": "Initial message to start the chat"
-          }
-        },
-        "required": [
-          "topic"
-        ]
-      },
-      "ChatMessageDto": {
-        "type": "object",
-        "properties": {
-          "content": {
-            "type": "string",
-            "example": "Hello, I need assistance with...",
-            "description": "Chat message content"
-          }
-        },
-        "required": [
-          "content"
-        ]
       }
     }
   }

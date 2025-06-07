@@ -1,13 +1,28 @@
-import { Controller, Post, Body, UseGuards, HttpCode, HttpStatus, Get } from '@nestjs/common';
-import { 
-  ApiTags, 
-  ApiOperation, 
-  ApiResponse, 
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  HttpCode,
+  HttpStatus,
+  Get,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
   ApiBearerAuth,
-  ApiBody 
+  ApiBody,
 } from '@nestjs/swagger';
 import { AuthService } from '../services/auth.service';
-import { LoginDto, RegisterDto, VerifyOtpDto, RequestPasswordResetDto, ResetPasswordDto, ChangePasswordDto } from '../dto/auth.dto';
+import {
+  LoginDto,
+  RegisterDto,
+  VerifyOtpDto,
+  RequestPasswordResetDto,
+  ResetPasswordDto,
+  ChangePasswordDto,
+} from '../dto/auth.dto';
 import { LocalAuthGuard } from '../guards/local-auth.guard';
 import { JwtAuthGuard } from '../guards/jwt-auth.guard';
 import { CurrentUser } from '../decorators/current-user.decorator';
@@ -18,8 +33,8 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @ApiOperation({ summary: 'Register new user' })
-  @ApiResponse({ 
-    status: 201, 
+  @ApiResponse({
+    status: 201,
     description: 'User successfully registered',
     schema: {
       example: {
@@ -30,16 +45,27 @@ export class AuthController {
           lastName: 'Doe',
           organisation: 'Acme Corp',
           role: 'DEVELOPER',
-          walletAddress: '0x...'
+          isVerified: false,
+          createdAt: '2024-01-01T00:00:00.000Z',
         },
-        wallet: {
-          address: '0x...',
-          encryptedPrivateKey: '...',
-          iv: '...'
+        apiKey: 'esp_1234567890abcdef...',
+        wallets: {
+          custodial: {
+            created: true,
+            count: 3,
+            networks: ['Circles'],
+          },
+          circle: {
+            status: 'success',
+            created: true,
+            count: 2,
+            blockchains: ['ETH-SEPOLIA', 'MATIC-AMOY'],
+            configured: true,
+          },
         },
-        message: 'Please check your email for verification code'
-      }
-    }
+        message: 'User created successfully',
+      },
+    },
   })
   @ApiResponse({ status: 400, description: 'Bad Request' })
   @ApiResponse({ status: 409, description: 'Email already exists' })
@@ -51,8 +77,8 @@ export class AuthController {
 
   @ApiOperation({ summary: 'Login user' })
   @ApiBody({ type: LoginDto })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'User successfully logged in',
     schema: {
       example: {
@@ -64,10 +90,10 @@ export class AuthController {
           lastName: 'Doe',
           organisation: 'Acme Corp',
           role: 'DEVELOPER',
-          walletAddress: '0x...'
-        }
-      }
-    }
+          walletAddress: '0x...',
+        },
+      },
+    },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @HttpCode(HttpStatus.OK)
@@ -105,8 +131,8 @@ export class AuthController {
 
   @ApiOperation({ summary: 'Get user profile' })
   @ApiBearerAuth()
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'User profile retrieved successfully',
     schema: {
       example: {
@@ -115,9 +141,9 @@ export class AuthController {
         firstName: 'John',
         lastName: 'Doe',
         organisation: 'Acme Corp',
-        role: 'DEVELOPER'
-      }
-    }
+        role: 'DEVELOPER',
+      },
+    },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @UseGuards(JwtAuthGuard)
@@ -137,12 +163,12 @@ export class AuthController {
   @ApiOperation({ summary: 'Change password' })
   async changePassword(
     @CurrentUser() user,
-    @Body() changePasswordDto: ChangePasswordDto
+    @Body() changePasswordDto: ChangePasswordDto,
   ) {
     return this.authService.changePassword(
       user.id,
       changePasswordDto.currentPassword,
-      changePasswordDto.newPassword
+      changePasswordDto.newPassword,
     );
   }
 
@@ -156,20 +182,14 @@ export class AuthController {
   @Post('2fa/verify')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Verify 2FA token' })
-  async verify2FA(
-    @CurrentUser() user,
-    @Body('token') token: string
-  ) {
+  async verify2FA(@CurrentUser() user, @Body('token') token: string) {
     return this.authService.verify2FA(user.id, token);
   }
 
   @Post('2fa/disable')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: 'Disable 2FA' })
-  async disable2FA(
-    @CurrentUser() user,
-    @Body('token') token: string
-  ) {
+  async disable2FA(@CurrentUser() user, @Body('token') token: string) {
     return this.authService.disable2FA(user.id, token);
   }
-} 
+}

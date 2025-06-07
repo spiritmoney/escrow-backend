@@ -299,7 +299,7 @@ export class BalanceController {
     }
   }
 
-  @Get('activity')
+  @Get('recent-activity')
   @ApiOperation({ summary: 'Get recent balance activity' })
   @ApiResponse({
     status: 200,

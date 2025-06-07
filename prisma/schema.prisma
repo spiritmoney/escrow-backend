@@ -19,8 +19,6 @@ model User {
   walletAddress        String?
   status               String                     @default("ACTIVE")
   name                 String?                    // Add name field for customer compatibility
-  stripeAccountId      String?
-  stripeAccountStatus  String                     @default("PENDING")
   isVerified           Boolean                    @default(false)
   otp                  String?
   otpExpiry            DateTime?
@@ -49,7 +47,6 @@ model User {
 
   cryptoReservations   CryptoBalanceReservation[]
   custodialWallets     CustodialWallet[]
-  stripeAccount        StripeAccount?
   notifications        Notification[]
   withdrawals          Withdrawal[]
 
@@ -135,7 +132,6 @@ model Transaction {
   paymentLink       PaymentLink? @relation(fields: [paymentLinkId], references: [id])
   disputes          Dispute[]
   milestones        Milestone[]
-  stripePaymentId   String?
   sandboxData       Json?      // For sandbox-specific data
   dealStage         String?    // Current deal stage
 
@@ -198,8 +194,6 @@ model PaymentLink {
   updatedAt          DateTime  @updatedAt
   expiresAt          DateTime?
   transactions       Transaction[]
-  stripeConnect      StripeAccount? @relation(fields: [stripeConnectId], references: [id])
-  stripeConnectId    String?
   details            Json?     // Add this field for cryptocurrency details
   isSandbox          Boolean   @default(true)
   sandboxMetadata    Json?     // For sandbox-specific data
@@ -404,21 +398,6 @@ model CustodialBalanceHistory {
 
 
 
-model StripeAccount {
-  id                String        @id @default(cuid())
-  userId            String        @unique
-  accountId         String        @unique
-  status            String        @default("PENDING")
-  detailsSubmitted  Boolean       @default(false)
-  chargesEnabled    Boolean       @default(false)
-  payoutsEnabled    Boolean       @default(false)
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
-  user              User          @relation(fields: [userId], references: [id])
-  paymentLinks      PaymentLink[]
-
-  @@map("stripe_accounts")
-}
 
 model Customer {
   id           String        @id @default(cuid())

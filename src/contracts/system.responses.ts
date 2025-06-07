@@ -200,7 +200,8 @@ export const systemResponses = {
 
     TRANSACTION_SUCCESS: 'Transaction completed successfully',
 
-    TRANSACTION_UNAUTHORIZED: 'Unauthorized to perform this transaction operation',
+    TRANSACTION_UNAUTHORIZED:
+      'Unauthorized to perform this transaction operation',
 
     TRANSACTION_NOT_FOUND: 'Transaction not found',
 
@@ -488,7 +489,8 @@ export const systemResponses = {
     TRANSACTION_UPDATE_FAILED: 'Failed to update transaction status',
 
     CUSTODIAL_WALLET_NOT_FOUND: 'Custodial wallet not found',
-    BRIDGE_INSUFFICIENT_LIQUIDITY: 'Insufficient liquidity for bridge operation',
+    BRIDGE_INSUFFICIENT_LIQUIDITY:
+      'Insufficient liquidity for bridge operation',
     BRIDGE_SLIPPAGE_TOO_HIGH: 'Bridge slippage too high',
 
     INVALID_REFRESH_TOKEN: 'Invalid or expired refresh token',
@@ -499,21 +501,19 @@ export const systemResponses = {
     INVALID_2FA_TOKEN: 'Invalid 2FA token',
     TWO_FACTOR_DISABLED: '2FA has been disabled successfully',
 
-    // Stripe Related
-    STRIPE_ACCOUNT_CREATION_FAILED: 'Failed to create Stripe account',
-    STRIPE_LINK_CREATION_FAILED: 'Failed to create Stripe account link',
-    STRIPE_CHECKOUT_FAILED: 'Failed to create checkout session',
+    // Payment Related
     WEBHOOK_PROCESSING_FAILED: 'Failed to process webhook',
     PAYMENT_PROCESSING_FAILED: 'Failed to process payment',
-    STRIPE_TRANSFER_FAILED: 'Failed to transfer funds',
-    TRANSACTION_INITIATION_FAILED: 'Failed to initiate transaction. Please try again.',
+    TRANSACTION_INITIATION_FAILED:
+      'Failed to initiate transaction. Please try again.',
 
     // Payment Link Related
     PAYMENT_LINK_FETCH_FAILED: 'Failed to fetch payment links',
     PAYMENT_LINK_DELETED: 'Payment link deleted successfully',
     PAYMENT_LINK_DELETE_FAILED: 'Failed to delete payment link',
     PAYMENT_LINK_UPDATED: 'Payment link updated successfully',
-    PAYMENT_LINK_HAS_ACTIVE_TRANSACTIONS: 'Cannot delete payment link with active transactions',
+    PAYMENT_LINK_HAS_ACTIVE_TRANSACTIONS:
+      'Cannot delete payment link with active transactions',
 
     INVALID_CRYPTO_DETAILS: 'Invalid cryptocurrency payment details',
     SANDBOX_MODE_ENABLED: 'This is a sandbox payment link',
@@ -521,7 +521,8 @@ export const systemResponses = {
     SANDBOX_MODE_PAYMENT_METHODS: 'This is a sandbox payment link',
     SANDBOX_MODE_DEFAULT_PAYMENT_METHOD: 'This is a sandbox payment link',
     SANDBOX_MODE_PAYMENT_METHOD_SETTINGS: 'This is a sandbox payment link',
-    PAYMENT_LINK_ALREADY_USED: 'This payment link has already been used and cannot be used again',
+    PAYMENT_LINK_ALREADY_USED:
+      'This payment link has already been used and cannot be used again',
 
     NOTIFICATIONS_MARKED_READ: 'All notifications have been marked as read',
   },

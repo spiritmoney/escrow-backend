@@ -92,7 +92,7 @@ export class ProcessPaymentDto {
   customerName: string;
 
   @ApiProperty({
-    description: 'Payment method token from Stripe/Paystack',
+    description: 'Payment method token',
     required: false,
   })
   @IsString()

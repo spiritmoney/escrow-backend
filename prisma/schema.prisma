@@ -28,7 +28,6 @@ model User {
   wallets              Wallet[]                   @relation("UserWallets")
   sentTransactions     Transaction[]              @relation("SentTransactions")
   receivedTransactions Transaction[]              @relation("ReceivedTransactions")
-  customerTransactions Transaction[]              @relation("CustomerTransactions")
   paymentRequests      PaymentRequest[]
   paymentLinks         PaymentLink[]
   paymentLinkSettings  PaymentLinkSettings?
@@ -127,8 +126,7 @@ model Transaction {
   data              Json?
   sender            User?       @relation("SentTransactions", fields: [senderId], references: [id])
   recipient         User?       @relation("ReceivedTransactions", fields: [recipientId], references: [id])
-  customer          User?       @relation("CustomerTransactions", fields: [customerId], references: [id], map: "transactions_user_customer_fkey")
-  customerRef       Customer?   @relation("CustomerTransactions", fields: [customerId], references: [id], map: "transactions_customer_ref_fkey")
+  customerRef       Customer?   @relation("CustomerTransactions", fields: [customerId], references: [id])
   paymentLink       PaymentLink? @relation(fields: [paymentLinkId], references: [id])
   disputes          Dispute[]
   milestones        Milestone[]

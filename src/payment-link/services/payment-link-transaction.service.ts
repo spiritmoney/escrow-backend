@@ -53,11 +53,11 @@ export class PaymentLinkTransactionService {
           customerEmail,
           customerName,
           paymentMethod: 'ONLINE',
-          customer: { connect: { id: customer.id } },
+          customerRef: { connect: { id: customer.id } },
           paymentLink: { connect: { id: paymentLinkId } },
         },
         include: {
-          customer: true,
+          customerRef: true,
           paymentLink: true,
         },
       });
@@ -87,7 +87,7 @@ export class PaymentLinkTransactionService {
         where: { id: transactionId },
         data: { status: 'COMPLETED' },
         include: {
-          customer: true,
+          customerRef: true,
           paymentLink: true,
         },
       });
@@ -112,7 +112,7 @@ export class PaymentLinkTransactionService {
       const transaction = await this.prisma.transaction.findUnique({
         where: { id: transactionId },
         include: {
-          customer: true,
+          customerRef: true,
           paymentLink: true,
         },
       });

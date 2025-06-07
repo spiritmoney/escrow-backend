@@ -717,7 +717,7 @@
         ]
       }
     },
-    "/balance/activity": {
+    "/balance/recent-activity": {
       "get": {
         "operationId": "BalanceController_getRecentActivity",
         "parameters": [],
@@ -1703,7 +1703,7 @@
           },
           "paymentMethodToken": {
             "type": "string",
-            "description": "Payment method token from Stripe/Paystack"
+            "description": "Payment method token"
           },
           "cryptoAddress": {
             "type": "string",

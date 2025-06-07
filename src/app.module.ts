@@ -30,6 +30,7 @@ import { WithdrawalService } from './services/withdrawal/withdrawal.service';
 import { ProfileService } from './profile/services/profile.service';
 import { CloudinaryService } from './services/cloudinary/cloudinary.service';
 import { HashingService } from './auth/services/hashing.service';
+import { KeepaliveService } from './services/keepalive/KeepaliveService';
 
 // Cloudinary Provider
 const CloudinaryProvider = {
@@ -108,6 +109,9 @@ const CloudinaryProvider = {
     // Cloud Services
     CloudinaryService,
     CloudinaryProvider,
+
+    // Keepalive Service
+    KeepaliveService,
   ],
   exports: [
     PrismaService,
